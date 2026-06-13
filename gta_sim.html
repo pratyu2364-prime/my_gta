@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PRATYUSH CITY — GTA Style</title>
+<title>Grand Thief Auxto: Bharat Version</title>
 <style>
   html,body{margin:0;padding:0;overflow:hidden;background:#000;font-family:Arial,Helvetica,sans-serif;user-select:none}
   #c{position:fixed;inset:0}
@@ -44,6 +44,8 @@
   #vig{position:fixed;inset:0;z-index:25;pointer-events:none;background:radial-gradient(ellipse at center,transparent 52%,rgba(190,0,0,.6) 100%);opacity:0}
   #xh{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:#fff;box-shadow:0 0 5px #000;z-index:12;display:none;pointer-events:none}
   #obj{position:fixed;left:214px;bottom:24px;z-index:10;font:700 14px Arial;color:#ffd23e;text-shadow:1px 1px 2px #000;pointer-events:none}
+  #bubble{position:fixed;z-index:14;transform:translate(-50%,-100%);background:rgba(255,255,255,.96);color:#1a2330;font:600 14px Arial;padding:7px 12px;border-radius:12px;border:2px solid #1a2330;max-width:240px;text-align:center;pointer-events:none;display:none}
+  #bubble:after{content:'';position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);border:8px solid transparent;border-top-color:#1a2330}
   #minimap{box-shadow:0 4px 18px rgba(0,0,0,.6),inset 0 0 30px rgba(0,0,0,.5)}
   #hpwrap{box-shadow:0 2px 6px rgba(0,0,0,.5)}
 </style>
@@ -53,14 +55,15 @@
 <div id="c"></div>
 <div id="err"><h1>Engine Error</h1><p id="errmsg"></p></div>
 <div id="intro">
-  <h1>PRATYUSH CITY</h1>
-  <h2>an open world crime sandbox</h2>
+  <h1>GRAND THIEF AUXTO</h1>
+  <h2>Bharat Version &nbsp;•&nbsp; an open world crime sandbox</h2>
   <table>
-    <tr><td>W A S D</td><td>drive / walk</td></tr>
-    <tr><td>MOUSE</td><td>look around &amp; aim (click to lock)</td></tr>
+    <tr><td>W A S D</td><td>drive / walk (camera-relative on foot)</td></tr>
+    <tr><td>MOUSE</td><td>look around &amp; aim — steers you on foot (click to lock)</td></tr>
     <tr><td>SPACE</td><td>handbrake (drift!)</td></tr>
     <tr><td>SHIFT</td><td>boost / sprint</td></tr>
-    <tr><td>E</td><td>enter / exit & steal cars and bikes</td></tr>
+    <tr><td>E</td><td>enter / exit & steal cars, bikes and autos</td></tr>
+    <tr><td>T</td><td>talk to nearby people</td></tr>
     <tr><td>CLICK / F</td><td>shoot (find gun pickups around the city)</td></tr>
     <tr><td>Q</td><td>switch weapon</td></tr>
     <tr><td>H</td><td>horn</td></tr>
@@ -82,6 +85,7 @@
 <div id="vig"></div>
 <div id="xh"></div>
 <div id="obj"></div>
+<div id="bubble"></div>
 <canvas id="minimap" width="190" height="190"></canvas>
 <div id="wasted" class="death">WASTED</div>
 <div id="busted" class="death">BUSTED</div>
@@ -310,8 +314,14 @@ function buildLandmark(b,cfg){
   else{sg.position.set(cx,wallH+.5,cz+entSign*(hd+.25));sg.rotation.y=entSign>0?0:Math.PI;}
   scene.add(sg);
   const lt=new THREE.PointLight(cfg.light,.7,Math.max(hw,hd)*2.6,2);lt.position.set(cx,wallH-1,cz);scene.add(lt);
+  // flat roof — auto-hidden while the player is inside so the camera can see in
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(2*hw+TH+.4,.4,2*hd+TH+.4),new THREE.MeshPhongMaterial({color:0x676d77,shininess:6}));
+  roof.position.set(cx,wallH+.25,cz);roof.castShadow=true;roof.receiveShadow=true;scene.add(roof);
+  // small parapet trim
+  const para=new THREE.Mesh(new THREE.BoxGeometry(2*hw+TH+.6,.5,2*hd+TH+.6),new THREE.MeshPhongMaterial({color:cfg.wall}));
+  para.position.set(cx,wallH+.5,cz);scene.add(para);roof.userData.para=para;
   buildLandmarkProps(cfg.type,cx,cz,hw,hd);
-  landmarks.push({type:cfg.type,name:cfg.name,x:cx,z:cz,r:Math.min(hw,hd)-1,
+  landmarks.push({type:cfg.type,name:cfg.name,x:cx,z:cz,hw,hd,roof,r:Math.min(hw,hd)-1,
     color:cfg.type==='hospital'?'#e74c3c':cfg.type==='police'?'#2e6fff':'#e67e22'});
 }
 {
@@ -387,6 +397,47 @@ function lightState(axis){
   return t<8.5?'R':t<15.5?'G':'Y';
 }
 
+// ---------- street props (instanced) + market stalls + cows ----------
+function propMesh(geo,mat,count){const m=new THREE.InstancedMesh(geo,mat,count);m.castShadow=true;m.instanceMatrix.setUsage(THREE.StaticDrawUsage);scene.add(m);return m;}
+{
+  const binGeo=new THREE.CylinderGeometry(.3,.26,.8,8),hydGeo=new THREE.CylinderGeometry(.18,.2,.7,8),benchGeo=new THREE.BoxGeometry(1.7,.18,.5);
+  const PMAX=140;
+  const iBin=propMesh(binGeo,new THREE.MeshPhongMaterial({color:0x2f6f3f}),PMAX);
+  const iHyd=propMesh(hydGeo,new THREE.MeshPhongMaterial({color:0xc0392b}),PMAX);
+  const iBench=propMesh(benchGeo,new THREE.MeshPhongMaterial({color:0x6b4a2e}),PMAX);
+  const _m=new THREE.Matrix4(),_p=new THREE.Vector3(),_q=new THREE.Quaternion(),_s=new THREE.Vector3(1,1,1),_z=new THREE.Matrix4().makeScale(0,0,0);
+  let nb=0,nh=0,ne=0;
+  const place=(x,z,alongZ)=>{const r=Math.random();_p.set(x,0,z);
+    if(r<.4&&nb<PMAX){_p.y=.4;_m.compose(_p,_q,_s);iBin.setMatrixAt(nb++,_m);}
+    else if(r<.7&&nh<PMAX){_p.y=.35;_m.compose(_p,_q,_s);iHyd.setMatrixAt(nh++,_m);}
+    else if(ne<PMAX){_p.y=.5;_q.setFromAxisAngle(new THREE.Vector3(0,1,0),alongZ?0:Math.PI/2);_m.compose(_p,_q,_s);iBench.setMatrixAt(ne++,_m);_q.identity();}};
+  for(const L of cityX)for(let z=L.a+12;z<L.b-12;z+=rnd(20,38))place(L.c+(Math.random()<.5?1:-1)*(HALF-1.2),z,true);
+  for(const W of cityZ)for(let x=W.a+12;x<W.b-12;x+=rnd(20,38))place(x,W.c+(Math.random()<.5?1:-1)*(HALF-1.2),false);
+  for(let i=nb;i<PMAX;i++)iBin.setMatrixAt(i,_z);
+  for(let i=nh;i<PMAX;i++)iHyd.setMatrixAt(i,_z);
+  for(let i=ne;i<PMAX;i++)iBench.setMatrixAt(i,_z);
+  iBin.instanceMatrix.needsUpdate=iHyd.instanceMatrix.needsUpdate=iBench.instanceMatrix.needsUpdate=true;
+  // colourful roadside market stalls
+  const canopy=[0xe74c3c,0x27ae60,0x2980b9,0xf1c40f,0xe67e22,0x9b59b6];
+  for(let i=0;i<12;i++){const L=pick(cityX),z=rnd(L.a+15,L.b-15),side=Math.random()<.5?1:-1,x=L.c+side*(HALF+1.6);
+    const st=new THREE.Group();
+    const base=new THREE.Mesh(new THREE.BoxGeometry(2.2,1,1.4),new THREE.MeshPhongMaterial({color:0x8a5a2b}));base.position.y=.5;base.castShadow=true;
+    const can=new THREE.Mesh(new THREE.BoxGeometry(2.6,.2,1.8),new THREE.MeshPhongMaterial({color:pick(canopy)}));can.position.y=1.5;
+    st.add(base,can);st.position.set(x,0,z);scene.add(st);}
+}
+function makeCow(){
+  const g=new THREE.Group();const hide=new THREE.MeshPhongMaterial({color:0xe8e0d0}),dark=new THREE.MeshPhongMaterial({color:0x4a3526});
+  const body=new THREE.Mesh(new THREE.BoxGeometry(1.0,1.0,2.0),hide);body.position.y=1.1;body.castShadow=true;g.add(body);
+  const head=new THREE.Mesh(new THREE.BoxGeometry(.6,.6,.7),hide);head.position.set(0,1.2,1.3);g.add(head);
+  for(const[lx,lz]of[[-.35,.7],[.35,.7],[-.35,-.7],[.35,-.7]]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.22,1.1,.22),dark);leg.position.set(lx,.55,lz);g.add(leg);}
+  scene.add(g);return g;
+}
+const cows=[];
+for(let i=0;i<4;i++){const c=makeCow(),W=pick(cityZ);c.position.set(rnd(-WORLD+40,WORLD-40),0,W.c+(Math.random()<.5?1:-1)*(HALF-2));cows.push({mesh:c,ang:rnd(0,7)});}
+function cowUpdate(c,dtF){const m=c.mesh;if(Math.random()<.012)c.ang+=rnd(-1,1);
+  m.position.x=M.clamp(m.position.x+Math.sin(c.ang)*.02*dtF,-WORLD+5,WORLD-5);
+  m.position.z=M.clamp(m.position.z+Math.cos(c.ang)*.02*dtF,-WORLD+5,WORLD-5);m.rotation.y=c.ang;}
+
 // ---------- vehicle factories ----------
 const headMat=new THREE.MeshPhongMaterial({color:0xfffdf0,emissive:0xfff6cc,emissiveIntensity:0});
 const tailMat=new THREE.MeshPhongMaterial({color:0x550000,emissive:0xff2200,emissiveIntensity:.4});
@@ -455,6 +506,19 @@ function makeBike(color){
   g.userData={wheels,hp:55,type:'bike',rad:1.0,lean,paint};
   scene.add(g);return g;
 }
+function makeRickshaw(){   // Bharat auto-rickshaw (3-wheeler)
+  const g=new THREE.Group();
+  const yellow=new THREE.MeshPhongMaterial({color:0xf4c20d,shininess:80}),green=new THREE.MeshPhongMaterial({color:0x1e7a3a,shininess:60}),blk=new THREE.MeshPhongMaterial({color:0x15181c});
+  const body=new THREE.Mesh(new THREE.BoxGeometry(1.7,1.0,2.6),yellow);body.position.y=.85;body.castShadow=true;g.add(body);
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(1.7,.5,2.0),green);roof.position.set(0,1.55,-.2);g.add(roof);
+  const front=new THREE.Mesh(new THREE.BoxGeometry(.85,.95,.8),yellow);front.position.set(0,.85,1.45);g.add(front);
+  const wheels=[];const wg=new THREE.CylinderGeometry(.42,.42,.22,12);wg.rotateZ(Math.PI/2);
+  const fw=new THREE.Mesh(wg,blk);fw.position.set(0,.42,1.45);g.add(fw);wheels.push(fw);
+  for(const wx of[-.78,.78]){const w=new THREE.Mesh(wg,blk);w.position.set(wx,.42,-.9);g.add(w);wheels.push(w);}
+  for(const sx of[-.5,.5]){const hl=new THREE.Mesh(new THREE.BoxGeometry(.16,.16,.08),headMat);hl.position.set(sx,.95,1.86);g.add(hl);}
+  g.userData={wheels,hp:55,type:'auto',rad:1.3,paint:yellow};
+  scene.add(g);return g;
+}
 
 // ---------- character system (shared rounded low-poly humanoid) ----------
 // geometry pivots: limbs hinge at top (hip/shoulder); rigid parts centered at rest height
@@ -481,21 +545,29 @@ const faceTex=(()=>{
 const faceMat=new THREE.MeshBasicMaterial({map:faceTex,transparent:true,alphaTest:.4,side:THREE.DoubleSide,depthWrite:false});
 function makeGun(kind){
   const g=new THREE.Group();
-  const metal=new THREE.MeshPhongMaterial({color:0x232629,shininess:70}),grip=new THREE.MeshPhongMaterial({color:0x141519});
-  const bar=(w,h,d,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),metal);m.position.z=z;g.add(m);};
+  const metal=new THREE.MeshPhongMaterial({color:0x26292e,shininess:95,specular:0x999999});
+  const dark=new THREE.MeshPhongMaterial({color:0x141519,shininess:35});
+  const wood=new THREE.MeshPhongMaterial({color:0x5a3a22,shininess:22});
+  const add=(w,h,d,mat,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);g.add(m);};
   if(kind==='uzi'){
-    bar(.08,.13,.5,.18);
-    const gp=new THREE.Mesh(new THREE.BoxGeometry(.07,.2,.1),grip);gp.position.set(0,-.13,0);g.add(gp);
-    const mag=new THREE.Mesh(new THREE.BoxGeometry(.06,.22,.07),grip);mag.position.set(0,-.18,.12);g.add(mag);
-    g.userData.muzzle=.46;
+    add(.09,.15,.46,metal,0,0,.13);    // receiver
+    add(.05,.05,.34,dark,0,.03,.42);   // barrel
+    add(.07,.24,.09,dark,0,-.18,.03);  // magazine
+    add(.06,.14,.09,dark,0,-.11,-.13); // grip
+    add(.04,.06,.03,dark,0,.11,.02);   // sight
+    g.userData.muzzle=.6;
   }else if(kind==='shotgun'){
-    bar(.1,.1,.74,.3);
-    const st=new THREE.Mesh(new THREE.BoxGeometry(.08,.14,.3),grip);st.position.set(0,-.06,-.2);g.add(st);
-    g.userData.muzzle=.68;
-  }else{
-    bar(.08,.12,.34,.12);
-    const gp=new THREE.Mesh(new THREE.BoxGeometry(.07,.18,.1),grip);gp.position.set(0,-.12,-.02);g.add(gp);
-    g.userData.muzzle=.3;
+    add(.07,.09,.82,metal,0,.01,.26);  // barrel
+    add(.06,.07,.52,dark,0,-.07,.18);  // pump tube
+    add(.08,.17,.36,wood,0,-.05,-.27); // stock
+    add(.06,.13,.09,wood,0,-.1,.01);   // grip
+    g.userData.muzzle=.72;
+  }else{ // pistol
+    add(.07,.14,.34,metal,0,.02,.12);  // slide
+    add(.055,.05,.38,dark,0,.07,.15);  // barrel rib
+    add(.06,.17,.1,dark,0,-.11,-.05);  // grip
+    add(.05,.05,.08,dark,0,-.04,.02);  // trigger guard
+    g.userData.muzzle=.36;
   }
   return g;
 }
@@ -530,9 +602,9 @@ function buildCharacter(skin,shirt,pants,hair,cop){
     const badge=mk(new THREE.BoxGeometry(.12,.18,.02),0xf1c40f,0);badge.position.set(.13,1.28,.2);g.add(badge);
   }
   // gun held in the right hand; the mount rotates with the aim (camera yaw)
-  const gunMount=new THREE.Group();gunMount.position.set(0,1.5,0);
+  const gunMount=new THREE.Group();gunMount.position.set(0,1.42,0);
   const guns={pistol:makeGun('pistol'),uzi:makeGun('uzi'),shotgun:makeGun('shotgun')};
-  for(const kk in guns){guns[kk].position.set(.3,0,.2);guns[kk].visible=false;gunMount.add(guns[kk]);}
+  for(const kk in guns){guns[kk].position.set(.17,-.04,.42);guns[kk].scale.setScalar(1.1);guns[kk].visible=false;gunMount.add(guns[kk]);}
   gunMount.visible=false;g.add(gunMount);
   g.userData.limbs=[lL,lR,aL,aR];g.userData.gunMount=gunMount;g.userData.guns=guns;
   return g;
@@ -666,14 +738,22 @@ function chime(){
 
 // ---------- input ----------
 const keys={};
-let started=false,firing=false,pressedE=false;
+let started=false,firing=false,pressedE=false,talkReq=false;
 let camYaw=0,camPitch=.12,lastMouse=-9,pointerLocked=false;
+let talkingPed=null;
+const TALK=['Namaste! Kaise ho?','Arre, dekh ke chalo, bhai!','Try the chaat at the food court, first class!',
+  'Traffic is mad today, na?','Bhai, which way to Connaught Place?','Police are everywhere these days, yaar.',
+  'Kya scene hai? Nice weather for a stroll.','Mind your own work, ji.','Auto! Auto! ...oh, not for me.',
+  'Jai Hind! \u{1F1EE}\u{1F1F3}','Chai pi lo, fir baat karte hain.','Yeh sheher kabhi sota nahi.'];
+function findNearestPed(r){let best=null,bd=r;for(const p of peds){if(p.state==='down'||p.state==='talk')continue;
+  const d=Math.hypot(p.x-player.x,p.z-player.z);if(d<bd){bd=d;best=p;}}return best;}
 addEventListener('keydown',e=>{
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
   keys[e.code]=true;start();
   if(e.code==='KeyM')toggleMap();
   if(e.code==='KeyQ')cycleWeapon();
   if(e.code==='KeyE')pressedE=true;
+  if(e.code==='KeyT')talkReq=true;
 });
 addEventListener('keyup',e=>keys[e.code]=false);
 const canvasEl=renderer.domElement;
@@ -726,17 +806,18 @@ function giveWeapon(w){
 // pickups
 const pickups=[];
 const gunMat=new THREE.MeshPhongMaterial({color:0x2ecc71,emissive:0x2ecc71,emissiveIntensity:.5});
-function spawnPickup(){
-  const it=pick(inters);
+function spawnPickup(px,pz,kind){
   const g=new THREE.Group();
   const b1=new THREE.Mesh(new THREE.BoxGeometry(.9,.3,.3),gunMat);
   const b2=new THREE.Mesh(new THREE.BoxGeometry(.25,.5,.25),gunMat);b2.position.set(-.25,-.3,0);
   g.add(b1,b2);
-  g.position.set(it.x+HALF+rnd(1,3),1.1,it.z+HALF+rnd(1,3));
-  g.userData.kind=pick(['pistol','pistol','uzi','shotgun']);
+  if(px===undefined){const it=pick(inters);px=it.x+HALF+rnd(1,3);pz=it.z+HALF+rnd(1,3);}
+  g.position.set(px,1.1,pz);
+  g.userData.kind=kind||pick(['pistol','pistol','uzi','shotgun']);
   scene.add(g);pickups.push(g);
 }
 for(let i=0;i<12;i++)spawnPickup();
+spawnPickup(spawnX+5,spawnZ-4,'pistol');   // starter weapon right where you begin
 // bullets
 const bullets=[];
 const bulletGeo=new THREE.BoxGeometry(.09,.09,.55);
@@ -756,12 +837,13 @@ function spawnAI(forceBike){
   const axis=Math.random()<.5?'z':'x';
   const line=axis==='z'?pick(cityX):pick(cityZ);
   const dir=Math.random()<.5?1:-1;
-  const bike=forceBike!==undefined?forceBike:Math.random()<.2;
+  const bike=forceBike!==undefined?forceBike:Math.random()<.18;
+  const auto=!bike&&forceBike===undefined&&Math.random()<.22;
   const color=pick([0xc0392b,0x2980b9,0x27ae60,0xe67e22,0x95a5a6,0x8e44ad,0xf1f1f1,0x2c3e50]);
-  const m=bike?makeBike(color):makeCar(color,false);
+  const m=bike?makeBike(color):auto?makeRickshaw():makeCar(color,false);
   const occupant=buildOccupant(false);pose(occupant,true);
   if(bike){m.userData.lean.add(occupant);occupant.position.set(0,.5,-.3);}
-  else{occupant.scale.setScalar(.85);occupant.position.set(-.45,.18,-.2);m.add(occupant);}
+  else{occupant.scale.setScalar(.85);occupant.position.set(auto?0:-.45,.18,auto?-.3:-.2);m.add(occupant);}
   const along=rnd(line.a+15,line.b-15);
   if(axis==='z')m.position.set(line.c+laneOff(axis,dir),0,along);
   else m.position.set(along,0,line.c+laneOff(axis,dir));
@@ -770,6 +852,12 @@ function spawnAI(forceBike){
 }
 for(let i=0;i<30;i++)spawnAI(false);
 for(let i=0;i<8;i++)spawnAI(true);
+// idle officers stationed inside each police station
+for(const Lm of landmarks)if(Lm.type==='police'){
+  for(let i=0;i<3;i++){const c=makeCiv(true);
+    c.position.set(Lm.x+rnd(-Lm.hw*.5,Lm.hw*.5),0,Lm.z+rnd(-Lm.hd*.5,Lm.hd*.5));
+    c.rotation.y=rnd(0,7);scene.add(c);}
+}
 
 function aiUpdate(ai,dtF){
   const m=ai.mesh,L=ai.line;
@@ -852,6 +940,12 @@ function thrownPed(x,z){
     state:'down',t:0,timer:2.4,local:true,sw:0,bob:0,dyaw:Math.random()*7,heading:0});
 }
 function pedUpdate(p,dtF){
+  if(p.state==='talk'){
+    p.talkT-=dtF/60;p.sw=0;p.bob=0;
+    p.heading=Math.atan2(player.x-p.x,player.z-p.z);
+    if(p.talkT<=0){p.state='walk';if(talkingPed===p)talkingPed=null;}
+    return;
+  }
   if(p.state==='down'){
     p.timer-=dtF/60;
     if(p.timer<=0){
@@ -1214,7 +1308,7 @@ function handleEnterExit(dtF){
   }else{
     const near=nearestEnterable();
     if(near){
-      const what=near.userData.type==='bike'?'bike':'car';
+      const what=near.userData.type==='bike'?'bike':near.userData.type==='auto'?'auto':'car';
       prompt.innerHTML='Press <b>E</b> to '+(parked.includes(near)?'ride this '+what:'<b>steal</b> this '+what);
       prompt.style.opacity=1;
     }else prompt.style.opacity=0;
@@ -1230,16 +1324,17 @@ function drawBlip(x,z,color,r){
   mm.fillStyle=color;mm.beginPath();
   mm.arc((x+WORLD)*ms,(z+WORLD)*ms,r/1.15,0,7);mm.fill();
 }
-let healCool=0;
+let healCool=0,insideLM=null;
 function checkLandmarks(dt){
-  if(player.inCar)return;
+  insideLM=null;
+  const onFoot=!player.inCar;
   for(const Lm of landmarks){
-    if(Math.hypot(player.x-Lm.x,player.z-Lm.z)<Lm.r){
-      if((Lm.type==='hospital'||Lm.type==='food')&&playerHp<100){
-        playerHp=Math.min(100,playerHp+24*dt);
-        healCool-=dt;if(healCool<=0){healCool=2.4;showMsg(Lm.type==='hospital'?'Patched up at the hospital':'Enjoy your meal!');}
-      }
-      break;
+    const inside=onFoot&&Math.abs(player.x-Lm.x)<Lm.hw-.3&&Math.abs(player.z-Lm.z)<Lm.hd-.3;
+    if(inside)insideLM=Lm;
+    Lm.roof.visible=!inside;Lm.roof.userData.para.visible=!inside;
+    if(inside&&(Lm.type==='hospital'||Lm.type==='food')&&playerHp<100){
+      playerHp=Math.min(100,playerHp+24*dt);
+      healCool-=dt;if(healCool<=0){healCool=2.6;showMsg(Lm.type==='hospital'?'Patched up at the hospital':'Tasty! Feeling better');}
     }
   }
 }
@@ -1286,9 +1381,10 @@ function toggleMap(){
 
 // ---------- zones ----------
 function zoneName(){
-  for(const b of blocks)if(b.park&&player.x>b.x0-12&&player.x<b.x1+12&&player.z>b.z0-12&&player.z<b.z1+12)return 'Greenfield Park';
+  for(const Lm of landmarks)if(Math.abs(player.x-Lm.x)<Lm.hw&&Math.abs(player.z-Lm.z)<Lm.hd)return Lm.name;
+  for(const b of blocks)if(b.park&&player.x>b.x0-12&&player.x<b.x1+12&&player.z>b.z0-12&&player.z<b.z1+12)return 'Nehru Park';
   const d=Math.hypot(player.x-spawnX,player.z-spawnZ);
-  return d<140?'Downtown':d<280?'Midtown':'The Outskirts';
+  return d<140?'Connaught Place':d<280?'Bazaar District':'City Outskirts';
 }
 
 // ---------- main loop ----------
@@ -1359,23 +1455,34 @@ function animate(){
         }
       }
     }else if(!jack){
-      const rot=(k.lf?1:0)-(k.rt?1:0);
-      player.heading+=rot*.06*dtF;
-      const sp=(k.up?1:k.dn?-.5:0)*(k.boost?.3:.16);
-      const fx=Math.sin(player.heading),fz=Math.cos(player.heading);
-      player.vx=fx*sp;player.vz=fz*sp;
+      // camera-relative movement — the character heads where the camera looks (GTA-style)
+      const worldAim=player.heading+camYaw;
+      const mfx=(k.up?1:0)-(k.dn?1:0), mst=(k.lf?1:0)-(k.rt?1:0), moving=(mfx||mst);
+      let moveX=0,moveZ=0;
+      if(moving){
+        moveX=mfx*Math.sin(worldAim)+mst*Math.sin(worldAim+Math.PI/2);
+        moveZ=mfx*Math.cos(worldAim)+mst*Math.cos(worldAim+Math.PI/2);
+        const ml=Math.hypot(moveX,moveZ)||1;moveX/=ml;moveZ/=ml;
+        const tgt=Math.atan2(moveX,moveZ);
+        let dh=tgt-player.heading;while(dh>Math.PI)dh-=2*Math.PI;while(dh<-Math.PI)dh+=2*Math.PI;
+        player.heading+=dh*Math.min(1,.35*dtF);
+        camYaw=worldAim-player.heading;     // body turns under the camera; camera holds its world direction
+      }
+      const sp=(k.boost?.3:.16);
+      player.vx=moveX*sp;player.vz=moveZ*sp;
       const pp={x:player.x+player.vx*dtF,z:player.z+player.vz*dtF,vx:0,vz:0};
       resolveCircle(pp,.5);
       player.x=M.clamp(pp.x,-WORLD+2,WORLD-2);player.z=M.clamp(pp.z,-WORLD+2,WORLD-2);
       char.position.set(player.x,0,player.z);char.rotation.y=player.heading;
-      const s=Math.sin(perf*(k.boost?16:10))*(sp!==0?1:0),L=char.userData.limbs;
+      const s=Math.sin(perf*(k.boost?16:10))*(moving?1:0),L=char.userData.limbs;
       L[0].rotation.x=s*.7;L[1].rotation.x=-s*.7;L[2].rotation.x=-s*.6;L[3].rotation.x=s*.6;
       // hold the gun out and aim with the camera when armed
       const aw0=owned[curW],gm=char.userData.gunMount;
       if(aw0!=='fist'){
         gm.visible=true;for(const kk in char.userData.guns)char.userData.guns[kk].visible=(kk===aw0);
-        gm.rotation.y=camYaw;L[2].rotation.x=-1.1;L[3].rotation.x=-1.3;
-      }else gm.visible=false;
+        gm.rotation.y=camYaw;                       // two-handed aim grip
+        L[3].rotation.set(-1.5,0,-.13);L[2].rotation.set(-1.32,0,.2);
+      }else{gm.visible=false;L[2].rotation.z=0;L[3].rotation.z=0;}
       for(const a of aiCars){
         if(Math.hypot(a.mesh.position.x-player.x,a.mesh.position.z-player.z)<1.6&&a.cur>.3)wastedNow();
       }
@@ -1405,6 +1512,13 @@ function animate(){
       spawnP(ox+Math.sin(aimAng)*.3,oy,oz+Math.cos(aimAng)*.3,0xfff2a0,.32,.07,0,.02,0);
     }
     checkLandmarks(dt);
+    // talk to nearby people
+    if(!player.inCar){
+      const tp=findNearestPed(4.5);
+      if(tp&&!talkingPed){const prm=document.getElementById('prompt');prm.innerHTML='Press <b>T</b> to talk';prm.style.opacity=1;}
+      if(talkReq&&tp){talkingPed=tp;tp.state='talk';tp.talkT=4.5;tp.line=pick(TALK);}
+    }
+    talkReq=false;
   }
   crimeCool=Math.max(0,crimeCool-dt);
 
@@ -1462,6 +1576,7 @@ function animate(){
 
   // --- world ---
   for(const a of aiCars)aiUpdate(a,dtF);
+  for(const c of cows)cowUpdate(c,dtF);
   for(const p of peds)pedUpdate(p,dtF);
   updateCrowd();
   const nsS=lightState('z');
@@ -1535,6 +1650,7 @@ function animate(){
   let dist,baseH,ly;
   if(player.inCar&&vehicle){dist=10+spd*4;baseH=3.4;ly=2;}
   else{dist=6.5;baseH=2.6;ly=1.6;}
+  if(insideLM&&!player.inCar){dist=4.2;baseH=4.6;ly=1.4;}   // tuck the camera in under the open roof
   const cx=player.x-cfx*dist*ch, cz=player.z-cfz*dist*ch, cy=baseH+dist*cv+(player.inCar?spd*1.4:0);
   camera.position.x=M.lerp(camera.position.x,cx,.12*dtF);
   camera.position.y=M.lerp(camera.position.y,cy,.12*dtF);
@@ -1560,6 +1676,17 @@ function animate(){
       eng.sirenG.gain.value=.025+.075*(1-pd/150);
       eng.siren.frequency.value=Math.sin(perf*7)>0?660:880;
     }else eng.sirenG.gain.value=0;
+  }
+
+  // --- speech bubble follows the person you're talking to ---
+  {
+    const bub=document.getElementById('bubble');
+    if(talkingPed&&talkingPed.state==='talk'){
+      _pos.set(talkingPed.x,2.2,talkingPed.z).project(camera);
+      if(_pos.z<1){bub.textContent=talkingPed.line;bub.style.display='block';
+        bub.style.left=((_pos.x*.5+.5)*innerWidth)+'px';bub.style.top=((-_pos.y*.5+.5)*innerHeight)+'px';}
+      else bub.style.display='none';
+    }else if(bub.style.display!=='none')bub.style.display='none';
   }
 
   // --- HUD ---

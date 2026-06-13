@@ -1,4 +1,4 @@
-# Pratyush City — a GTA-style open world in one HTML file
+# Grand Thief Auxto: Bharat Version — a GTA-style open world in one HTML file
 
 A free-roam crime sandbox in the spirit of classic GTA, written as a **single self-contained
 `gta_sim.html`** (three.js r128 from CDN — no build step, no install).
@@ -31,8 +31,13 @@ Needs internet on first load (three.js + font come from CDNs). Click or press an
 
 - **Asymmetric procedural city** — irregular road grid with partial dead-end streets,
   downtown / midtown / outskirts districts, parks; different layout every load
-- **Mouse-look camera** — GTA-style free orbit around the player (pointer lock); aim where
-  you look, camera eases back behind you when driving
+- **Mouse-look camera that steers you** — GTA-style free orbit (pointer lock); on foot the
+  character walks where the camera faces and turns to follow it; aim where you look
+- **Talk to people** — press **T** near anyone for a speech bubble (Bharat-flavored chatter)
+- **Bharat detailing** — auto-rickshaws in traffic, roaming cows, roadside market stalls,
+  instanced street furniture (bins, hydrants, benches), zones like Connaught Place
+- **Enterable landmarks with interiors & roofs** — hospital, food court, and a police
+  station staffed with officers; the roof fades away as you step inside
 - **Detailed characters & big crowds** — rounded low-poly humanoids with **faces**
   (eyes/brows/mouth); player, cops, drivers, pedestrians. The civilian crowd is
   GPU-instanced (one draw call per body part) so it scales to hundreds
