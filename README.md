@@ -18,6 +18,7 @@ Needs internet on first load (three.js + font come from CDNs). Click or press an
 | Key | Action |
 |---|---|
 | W A S D / arrows | drive / walk |
+| MOUSE | look around & aim (click to lock the pointer) |
 | E | enter / exit vehicles, **carjack** (walk to door, pull the driver out) |
 | SPACE | handbrake — drift |
 | SHIFT | nitro boost / sprint |
@@ -30,9 +31,18 @@ Needs internet on first load (three.js + font come from CDNs). Click or press an
 
 - **Asymmetric procedural city** — irregular road grid with partial dead-end streets,
   downtown / midtown / outskirts districts, parks; different layout every load
-- **Detailed characters & big crowds** — rounded low-poly humanoids (player, cops,
-  drivers, pedestrians); the civilian crowd is GPU-instanced (one draw call per body part)
-  so it scales to hundreds without tanking framerate
+- **Mouse-look camera** — GTA-style free orbit around the player (pointer lock); aim where
+  you look, camera eases back behind you when driving
+- **Detailed characters & big crowds** — rounded low-poly humanoids with **faces**
+  (eyes/brows/mouth); player, cops, drivers, pedestrians. The civilian crowd is
+  GPU-instanced (one draw call per body part) so it scales to hundreds
+- **Held weapons** — pistol / uzi / shotgun are visibly held and aimed in-hand, with
+  muzzle flash and bullets from the barrel
+- **Enterable landmarks** — walk into the **hospital** (heals you), **food court** (heals
+  you), and **police station**; each has signage, an interior, and a map blip
+- **Smarter police** — siren volume rises as the nearest unit closes in; officers get out
+  and **open your car door before arresting you** (speed off and the bust is cancelled);
+  stealing a car only earns a wanted star if the cops are nearby to witness it
 - **On-foot + vehicles** — cars and motorcycles, all stealable with a proper jack
   sequence (door swings open, driver thrown to the street); drivers/riders are visible
   through glass cabins
