@@ -50,6 +50,12 @@
   #hpwrap{box-shadow:0 2px 6px rgba(0,0,0,.5)}
 </style>
 <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 </head>
 <body>
 <div id="c"></div>
@@ -162,6 +168,29 @@ document.getElementById('c').appendChild(renderer.domElement);
   scene.environment=pmrem.fromEquirectangular(et).texture;et.dispose();pmrem.dispose();
 }
 scene.fog=new THREE.Fog(0x87ceeb,120,900);
+// ---------- post-processing: bloom + cinematic colour grade (degrades gracefully if CDN modules miss) ----------
+let composer=null,bloomPass=null;
+if(THREE.EffectComposer&&THREE.UnrealBloomPass&&THREE.RenderPass&&THREE.ShaderPass)try{
+  composer=new THREE.EffectComposer(renderer);
+  composer.addPass(new THREE.RenderPass(scene,camera));
+  bloomPass=new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),.55,.6,.82); // strength, radius, threshold
+  composer.addPass(bloomPass);
+  const GradeShader={
+    uniforms:{tDiffuse:{value:null},sat:{value:.93},con:{value:1.09},vig:{value:.42}},
+    vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+    fragmentShader:'varying vec2 vUv;uniform sampler2D tDiffuse;uniform float sat,con,vig;'
+      +'void main(){vec3 c=texture2D(tDiffuse,vUv).rgb;'
+      +'c=(c-0.5)*con+0.5;'                                   // contrast
+      +'float l=dot(c,vec3(0.299,0.587,0.114));c=mix(vec3(l),c,sat);' // desaturate slightly
+      +'c*=vec3(1.03,1.0,0.97);'                              // gentle warm grade
+      +'float d=distance(vUv,vec2(0.5));c*=mix(1.0,0.6,clamp((d-0.25)*vig*2.2,0.0,1.0));' // vignette
+      +'c=pow(clamp(c,0.0,1.0),vec3(1.0/2.2));'               // linear -> sRGB (composer target is linear)
+      +'gl_FragColor=vec4(c,1.0);}'
+  };
+  composer.addPass(new THREE.ShaderPass(GradeShader));
+  composer.setSize(innerWidth,innerHeight);
+}catch(e){composer=null;}
+function renderFrame(){composer?composer.render():renderer.render(scene,camera);}
 const hemi=new THREE.HemisphereLight(0xbfd6ff,0x4a4034,.6);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff2dd,1.1);
 sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
@@ -1519,7 +1548,7 @@ function animate(){
   requestAnimationFrame(animate);
   const dt=Math.min(clock.getDelta(),.05),dtF=dt*60;
   perf+=dt;frame++;
-  if(!started||bigOpen){renderer.render(scene,camera);return;}
+  if(!started||bigOpen){renderFrame();return;}
   const k=inp();
   lightT+=dt;tod=(tod+dt/480)%1;
 
@@ -1834,7 +1863,7 @@ function animate(){
     const z=zoneName();
     if(z!==curZone){curZone=z;document.getElementById('zone').textContent=z;}
   }
-  renderer.render(scene,camera);
+  renderFrame();
 }
 camera.position.set(player.x,5,player.z-10);
 animate();
@@ -1842,6 +1871,8 @@ animate();
 addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
+  if(composer)composer.setSize(innerWidth,innerHeight);
+  if(bloomPass)bloomPass.setSize(innerWidth,innerHeight);
 });
 }
 </script>
