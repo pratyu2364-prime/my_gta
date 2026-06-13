@@ -210,6 +210,22 @@ const hlights=[0,1].map(()=>{
   const s=new THREE.SpotLight(0xfff3d0,0,60,.55,.5,1.3);
   scene.add(s);scene.add(s.target);return s;
 });
+// ---------- gradient sky dome with sun disk (bloom turns it into a soft glow) ----------
+let sky=null;
+try{
+  const skyMat=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,depthTest:false,fog:false,
+    uniforms:{top:{value:new THREE.Color(0x2f6fb0)},bot:{value:new THREE.Color(0x87ceeb)},
+              sunDir:{value:new THREE.Vector3(0,1,0)},sunCol:{value:new THREE.Color(1,.9,.7)}},
+    vertexShader:'varying vec3 vp;void main(){vp=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+    fragmentShader:'varying vec3 vp;uniform vec3 top,bot,sunDir,sunCol;'
+      +'void main(){float h=clamp(vp.y*0.5+0.5,0.0,1.0);vec3 c=mix(bot,top,pow(h,0.65));'
+      +'float s=max(dot(vp,normalize(sunDir)),0.0);'
+      +'c+=sunCol*pow(s,250.0)*1.6;'      // crisp sun disk
+      +'c+=sunCol*pow(s,7.0)*0.16;'       // warm glow around it
+      +'gl_FragColor=vec4(c,1.0);}'});
+  sky=new THREE.Mesh(new THREE.SphereGeometry(1000,32,16),skyMat);
+  sky.frustumCulled=false;sky.renderOrder=-1;scene.add(sky);
+}catch(e){sky=null;}
 
 // ---------- ground painted onto one texture ----------
 const blocks=[];
@@ -615,7 +631,7 @@ function makeCar(color,cop){
 }
 function makeBike(color){
   const g=new THREE.Group(),lean=new THREE.Group();g.add(lean);
-  const paint=new THREE.MeshPhongMaterial({color,shininess:90});
+  const paint=new THREE.MeshStandardMaterial({color,roughness:.35,metalness:.55,envMapIntensity:1.0});
   const wheels=[];
   for(const wz of[.95,-.85]){
     const w=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.16,10),wheelMat);
@@ -638,7 +654,7 @@ function makeBike(color){
 }
 function makeRickshaw(){   // Bharat auto-rickshaw (3-wheeler)
   const g=new THREE.Group();
-  const yellow=new THREE.MeshPhongMaterial({color:0xf4c20d,shininess:80}),green=new THREE.MeshPhongMaterial({color:0x1e7a3a,shininess:60}),blk=new THREE.MeshPhongMaterial({color:0x15181c});
+  const yellow=new THREE.MeshStandardMaterial({color:0xf4c20d,roughness:.4,metalness:.45,envMapIntensity:.9}),green=new THREE.MeshStandardMaterial({color:0x1e7a3a,roughness:.45,metalness:.4,envMapIntensity:.8}),blk=new THREE.MeshStandardMaterial({color:0x15181c,roughness:.5,metalness:.3});
   const body=new THREE.Mesh(new THREE.BoxGeometry(1.7,1.0,2.6),yellow);body.position.y=.85;body.castShadow=true;g.add(body);
   const roof=new THREE.Mesh(new THREE.BoxGeometry(1.7,.5,2.0),green);roof.position.set(0,1.55,-.2);g.add(roof);
   const front=new THREE.Mesh(new THREE.BoxGeometry(.85,.95,.8),yellow);front.position.set(0,.85,1.45);g.add(front);
@@ -1541,7 +1557,8 @@ function zoneName(){
 const clock=new THREE.Clock();
 let perf=0,frame=0,curZone='',fireT=0;
 const skyDay=new THREE.Color(0x87ceeb),skyNight=new THREE.Color(0x0b1026),skySet=new THREE.Color(0xff8c5a);
-const skyCol=new THREE.Color();
+const skyTopDay=new THREE.Color(0x2f6fb0),skyTopNight=new THREE.Color(0x04060d);
+const skyCol=new THREE.Color(),skyTopCol=new THREE.Color(),_sunDir=new THREE.Vector3();
 newMission();weaponHUD();
 
 function animate(){
@@ -1772,6 +1789,15 @@ function animate(){
   const sf=Math.max(0,.3-Math.abs(el))/.3*(el>-.1?1:0)*.55;
   skyCol.lerp(skySet,sf);
   scene.background=skyCol;scene.fog.color.copy(skyCol);
+  if(sky){ // drive the dome gradient + sun disk from the same day/night state
+    skyTopCol.copy(skyTopNight).lerp(skyTopDay,dayF).lerp(skySet,sf*.5);
+    sky.material.uniforms.top.value.copy(skyTopCol);
+    sky.material.uniforms.bot.value.copy(skyCol);
+    _sunDir.set(sun.position.x-player.x,sun.position.y,sun.position.z-player.z).normalize();
+    sky.material.uniforms.sunDir.value.copy(_sunDir);
+    sky.material.uniforms.sunCol.value.setRGB(1,.92,.74).multiplyScalar(.45+dayF*.7);
+    sky.position.set(player.x,0,player.z);
+  }
   sun.intensity=Math.max(0,el)*1.15;
   hemi.intensity=.1+dayF*.34;     // env map now supplies ambient fill, so dial the hemisphere down
   const night=1-dayF;
