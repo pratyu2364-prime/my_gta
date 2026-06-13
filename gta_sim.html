@@ -321,8 +321,8 @@ const roofMat=new THREE.MeshStandardMaterial({color:0x2c2f33,roughness:.85,metal
 const colliders=[];
 const treeGeoT=new THREE.CylinderGeometry(.35,.5,3.4,6);
 const treeGeoL=new THREE.SphereGeometry(2.4,7,6);
-const treeMatT=new THREE.MeshPhongMaterial({color:0x6b4a2e});
-const treeMatL=new THREE.MeshPhongMaterial({color:0x2f6b2a});
+const treeMatT=new THREE.MeshStandardMaterial({color:0x6b4a2e,roughness:.92,metalness:0});
+const treeMatL=new THREE.MeshStandardMaterial({color:0x2f6b2a,roughness:.9,metalness:0,envMapIntensity:.3});
 function addTree(x,z){
   const t=new THREE.Mesh(treeGeoT,treeMatT);t.position.set(x,1.7,z);t.castShadow=true;scene.add(t);
   const base=rnd(.85,1.25);
@@ -572,7 +572,7 @@ function propMesh(geo,mat,count){const m=new THREE.InstancedMesh(geo,mat,count);
     st.add(base,can);st.position.set(x,0,z);scene.add(st);}
 }
 function makeCow(){
-  const g=new THREE.Group();const hide=new THREE.MeshPhongMaterial({color:0xe8e0d0}),dark=new THREE.MeshPhongMaterial({color:0x4a3526});
+  const g=new THREE.Group();const hide=new THREE.MeshStandardMaterial({color:0xe8e0d0,roughness:.85,metalness:0,envMapIntensity:.2}),dark=new THREE.MeshStandardMaterial({color:0x4a3526,roughness:.85,metalness:0});
   const body=new THREE.Mesh(new THREE.BoxGeometry(1.0,1.0,2.0),hide);body.position.y=1.1;body.castShadow=true;g.add(body);
   const head=new THREE.Mesh(new THREE.BoxGeometry(.6,.6,.7),hide);head.position.set(0,1.2,1.3);g.add(head);
   for(const[lx,lz]of[[-.35,.7],[.35,.7],[-.35,-.7],[.35,-.7]]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.22,1.1,.22),dark);leg.position.set(lx,.55,lz);g.add(leg);}
@@ -731,7 +731,7 @@ const SKIN=SKINc.map(c=>new THREE.Color(c)),SHIRT=SHIRTc.map(c=>new THREE.Color(
 
 function buildCharacter(skin,shirt,pants,hair,cop){
   const g=new THREE.Group();
-  const mk=(geo,col,sh)=>{const m=new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:col,shininess:14}));m.castShadow=sh;return m;};
+  const mk=(geo,col,sh)=>{const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:col,roughness:.8,metalness:.05,envMapIntensity:.18}));m.castShadow=sh;return m;};
   const lL=mk(legGeo,pants,1),lR=mk(legGeo,pants,1);
   lL.position.set(JOINT.legL[0],JOINT.legL[1],0);lR.position.set(JOINT.legR[0],JOINT.legR[1],0);
   const hip=mk(hipGeo,pants,1);hip.position.y=REST.hip;
@@ -761,7 +761,7 @@ function makeCiv(cop){return buildCharacter(pick(SKINc),cop?0x1e3799:pick(SHIRTc
 function buildOccupant(cop){
   const g=new THREE.Group();
   const shirt=cop?0x1e3799:pick(SHIRTc),skin=pick(SKINc),hair=cop?0x141414:pick(HAIRc);
-  const mk=(geo,col)=>new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:col,shininess:14}));
+  const mk=(geo,col)=>new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:col,roughness:.8,metalness:.05,envMapIntensity:.18}));
   const torso=mk(torsoGeo,shirt);torso.position.y=REST.torso;torso.castShadow=true;
   const aL=mk(armGeo,shirt),aR=mk(armGeo,shirt);
   aL.position.set(JOINT.armL[0],JOINT.armL[1],0);aR.position.set(JOINT.armR[0],JOINT.armR[1],0);
@@ -782,7 +782,7 @@ function pose(mesh,seated){
 // ---------- instanced crowd (one InstancedMesh per body part → fixed draw calls) ----------
 const MAXP=220;
 function instPart(geo,sh){
-  const m=new THREE.InstancedMesh(geo,new THREE.MeshPhongMaterial({color:0xffffff,shininess:13}),MAXP);
+  const m=new THREE.InstancedMesh(geo,new THREE.MeshStandardMaterial({color:0xffffff,roughness:.82,metalness:.05,envMapIntensity:.18}),MAXP);
   m.castShadow=sh;m.receiveShadow=false;m.frustumCulled=false;
   m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);scene.add(m);return m;
 }
