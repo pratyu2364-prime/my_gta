@@ -20,7 +20,8 @@ in a single `<script>` inside `main()`. Keep it that way unless the user asks ot
 | Ground | `paintCity(ctx,S,mini)` | Paints the ENTIRE city (roads, sidewalks, markings, crosswalks) onto one canvas — used at 2048px as the ground texture AND at 720px as the minimap image. Edit roads → edit this one function. |
 | Buildings | `blocks[]`, `colliders[]` | `colliders` are AABBs `{x0,x1,z0,z1}` used by ALL collision. |
 | Vehicles | `makeCar(color,cop)`, `makeBike(color)` | `userData = {wheels, hp, type:'car'|'bike', rad, paint, door?, lean?, beacons?}`. The car's `door` group is hinged at its front edge; swing = `rotation.y` 0→1.15. |
-| Peds | `makePed(cop)`, `pose(mesh,seated)`, `peds[]` | Limbs in `userData.limbs`; walk anim = sin swings. |
+| Characters | `buildCharacter()`, `buildOccupant()`, `makeCiv()`, `pose()` | Shared rounded low-poly humanoid (cylinder limbs, icosa head, hair). `buildCharacter` = full Group (player `char`, foot-cops). `buildOccupant` = legless seated bust for in-car occupants (legs hidden → fewer draw calls); its `userData.limbs[0/1]` are `null`, so `pose()` guards `L[0]`. Geometry pivots: limbs hinge at top, rigid parts centered; offsets live in `REST`/`JOINT` and MUST match the matrix math in `updateCrowd`. |
+| Crowd (peds) | `peds[]` (data records, NO mesh), 8 `InstancedMesh` parts (`iLegL`…`iHair`), `updateCrowd()`, `setCrowdColor()` | The wandering civilian crowd is **instanced**: one InstancedMesh per body part → ~8 draw calls regardless of count (`MAXP=220`, start 130). Each ped record holds `x,z,heading,sw,bob,state`. `updateCrowd()` composes per-instance matrices from scratch `Matrix4`s (no per-frame allocation): rigid part world = `R·offset`, limb world = `R·(jointT·Rx(swing))`. **Never `splice(peds)`** — instance index = array index; down peds respawn in place, thrown drivers recycle the farthest record. Per-instance colour via `setColorAt` + `colorsDirty` flag. |
 | Player | `player{x,z,vx,vz,heading,inCar,steer}`, `char`, `vehicle` | `player.x/z` is ALWAYS current position (synced in-car). Physics: velocity decomposed into forward/lateral; lateral grip damping = drift. |
 | Carjack | `jack`, `startJack/jackUpdate/finishJack`, `doors[]`, `openDoor` | State machine: walk → open (door anim) → pull (occupant thrown via `thrownPed`) → in. AI car gets `ai.jacked=true` (freezes it). |
 | Traffic AI | `aiCars[]`, `aiUpdate` | Cars follow line objects, turn at `cross` lines, U-turn at extent ends, obey `lightState(axis)`, brake for player + peds. `ai.occupant` = visible driver/rider. |
@@ -58,6 +59,11 @@ Harness lives in `/tmp/gta_test` (recreate if gone):
   a key to start, simulate KeyE/KeyW/KeyA, snapshot DOM HUD state
   (`#speedo, #prompt, #zone, #weapon`) and take screenshots, assert `NO JS ERRORS`.
 - Headless FPS is ~10, so allow 2× real-time for timed sequences (e.g. the carjack).
+- **CRITICAL: errors are swallowed.** `main()` is wrapped in try/catch that renders to the
+  `#err` div instead of throwing — so a `pageerror`/console listener reports "NO JS ERRORS"
+  even on a fatal init crash. Tests MUST also check
+  `document.getElementById('err').style.display==='flex'` (and read `#errmsg`). A screenshot
+  is the most reliable smoke test. (This is how the legless-occupant `pose()` null crash hid.)
 - Quick syntax check without a browser:
   `node -e "new Function(require('fs').readFileSync('gta_sim.html','utf8').match(/<script>([\s\S]*?)<\/script>/g).pop().replace(/<\/?script>/g,''))"`.
 

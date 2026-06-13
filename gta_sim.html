@@ -376,32 +376,116 @@ function makeBike(color){
   scene.add(g);return g;
 }
 
-// ---------- pedestrian factory ----------
-const limbGeo=new THREE.BoxGeometry(.22,.8,.22);limbGeo.translate(0,-.4,0);
-const skinMats=[0xd9a173,0x8c5a3c,0xeac2a0,0x6b4226].map(c=>new THREE.MeshPhongMaterial({color:c}));
-const pedShirts=[0xc0392b,0x2980b9,0x27ae60,0xf39c12,0x8e44ad,0xecf0f1,0x34495e,0xe056a0].map(c=>new THREE.MeshPhongMaterial({color:c}));
-const pedPants=[0x2c3e50,0x5d4037,0x37474f,0x4e342e].map(c=>new THREE.MeshPhongMaterial({color:c}));
-const copShirt=new THREE.MeshPhongMaterial({color:0x1e3799});
-const copPants=new THREE.MeshPhongMaterial({color:0x0a192f});
-function makePed(cop){
+// ---------- character system (shared rounded low-poly humanoid) ----------
+// geometry pivots: limbs hinge at top (hip/shoulder); rigid parts centered at rest height
+const legGeo=new THREE.CylinderGeometry(.105,.075,.92,8);legGeo.translate(0,-.46,0);
+const armGeo=new THREE.CylinderGeometry(.072,.055,.72,7);armGeo.translate(0,-.36,0);
+const torsoGeo=new THREE.CylinderGeometry(.27,.19,.72,8);          // tapered to waist
+const hipGeo=new THREE.CylinderGeometry(.19,.2,.22,8);
+const headGeo=new THREE.IcosahedronGeometry(.185,1);headGeo.scale(1,1.12,1);
+const hairGeo=new THREE.IcosahedronGeometry(.205,1);hairGeo.scale(1,.62,1);hairGeo.translate(0,.07,0);
+const capGeo=new THREE.CylinderGeometry(.215,.215,.12,10);
+const brimGeo=new THREE.BoxGeometry(.42,.05,.2);brimGeo.translate(0,0,.18);
+// rest offsets / joint positions (must match the matrix math in updateCrowd)
+const REST={torso:1.22,hip:.96,head:1.79,hair:1.84};
+const JOINT={legL:[-.12,.94,0],legR:[.12,.94,0],armL:[-.30,1.55,.02],armR:[.30,1.55,.02]};
+// colour palettes
+const SKINc=[0xe8b88f,0xd9a173,0xc28e63,0x9c6a43,0x7a4a2b];
+const SHIRTc=[0xc0392b,0x2980b9,0x27ae60,0xf39c12,0x8e44ad,0xecf0f1,0x34495e,0xe056a0,0x16a085,0xd35400,0x2c3e50];
+const PANTSc=[0x2c3e50,0x5d4037,0x37474f,0x4e342e,0x1b2631,0x4b5563];
+const HAIRc=[0x2b1b0e,0x4a2f17,0x141414,0x6b4423,0x8a8a8a,0xb8902f];
+const SKIN=SKINc.map(c=>new THREE.Color(c)),SHIRT=SHIRTc.map(c=>new THREE.Color(c)),
+      PANTS=PANTSc.map(c=>new THREE.Color(c)),HAIR=HAIRc.map(c=>new THREE.Color(c));
+
+function buildCharacter(skin,shirt,pants,hair,cop){
   const g=new THREE.Group();
-  const pants=cop?copPants:pick(pedPants),shirt=cop?copShirt:pick(pedShirts),skin=pick(skinMats);
-  const lL=new THREE.Mesh(limbGeo,pants),lR=new THREE.Mesh(limbGeo,pants);
-  lL.position.set(-.14,.8,0);lR.position.set(.14,.8,0);
-  const torso=new THREE.Mesh(new THREE.BoxGeometry(.55,.7,.3),shirt);torso.position.y=1.15;torso.castShadow=true;
-  const aL=new THREE.Mesh(limbGeo,shirt),aR=new THREE.Mesh(limbGeo,shirt);
-  aL.scale.set(.8,.85,.8);aR.scale.set(.8,.85,.8);
-  aL.position.set(-.36,1.48,0);aR.position.set(.36,1.48,0);
-  const head=new THREE.Mesh(new THREE.BoxGeometry(.32,.34,.32),skin);head.position.y=1.72;
-  g.add(lL,lR,torso,aL,aR,head);
-  if(cop){const cap=new THREE.Mesh(new THREE.BoxGeometry(.36,.12,.38),copPants);cap.position.y=1.93;g.add(cap);}
+  const mk=(geo,col,sh)=>{const m=new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:col,shininess:14}));m.castShadow=sh;return m;};
+  const lL=mk(legGeo,pants,1),lR=mk(legGeo,pants,1);
+  lL.position.set(JOINT.legL[0],JOINT.legL[1],0);lR.position.set(JOINT.legR[0],JOINT.legR[1],0);
+  const hip=mk(hipGeo,pants,1);hip.position.y=REST.hip;
+  const torso=mk(torsoGeo,shirt,1);torso.position.y=REST.torso;
+  const aL=mk(armGeo,shirt,0),aR=mk(armGeo,shirt,0);
+  aL.position.set(JOINT.armL[0],JOINT.armL[1],0);aR.position.set(JOINT.armR[0],JOINT.armR[1],0);
+  const head=mk(headGeo,skin,1);head.position.y=REST.head;
+  const hairM=mk(hairGeo,cop?0x141414:hair,0);hairM.position.y=REST.hair;
+  g.add(lL,lR,hip,torso,aL,aR,head,hairM);
+  if(cop){
+    const cap=mk(capGeo,0x0a192f,0);cap.position.y=1.96;
+    const brim=mk(brimGeo,0x0a192f,0);brim.position.y=1.93;
+    cap.add(brim);g.add(cap);
+    const badge=mk(new THREE.BoxGeometry(.12,.18,.02),0xf1c40f,0);badge.position.set(.13,1.28,.2);g.add(badge);
+  }
   g.userData.limbs=[lL,lR,aL,aR];
-  scene.add(g);return g;
+  return g;
+}
+function makeCiv(cop){return buildCharacter(pick(SKINc),cop?0x1e3799:pick(SHIRTc),cop?0x0a192f:pick(PANTSc),pick(HAIRc),cop);}
+// lighter "seated bust" for vehicle occupants (legs hidden in the cabin → omit them)
+function buildOccupant(cop){
+  const g=new THREE.Group();
+  const shirt=cop?0x1e3799:pick(SHIRTc),skin=pick(SKINc),hair=cop?0x141414:pick(HAIRc);
+  const mk=(geo,col)=>new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:col,shininess:14}));
+  const torso=mk(torsoGeo,shirt);torso.position.y=REST.torso;torso.castShadow=true;
+  const aL=mk(armGeo,shirt),aR=mk(armGeo,shirt);
+  aL.position.set(JOINT.armL[0],JOINT.armL[1],0);aR.position.set(JOINT.armR[0],JOINT.armR[1],0);
+  const head=mk(headGeo,skin);head.position.y=REST.head;
+  const hairM=mk(hairGeo,hair);hairM.position.y=REST.hair;
+  g.add(torso,aL,aR,head,hairM);
+  if(cop){const cap=mk(capGeo,0x0a192f);cap.position.y=1.96;g.add(cap);}
+  g.userData.limbs=[null,null,aL,aR];
+  return g;
 }
 function pose(mesh,seated){
-  const L=mesh.userData.limbs;
-  L[0].rotation.x=L[1].rotation.x=seated?1.25:0;
-  L[2].rotation.x=L[3].rotation.x=seated?-.85:0;
+  const L=mesh.userData.limbs;if(!L)return;
+  if(L[0]){L[0].rotation.x=L[1].rotation.x=seated?1.2:0;}
+  L[2].rotation.x=L[3].rotation.x=seated?-.8:0;
+}
+
+// ---------- instanced crowd (one InstancedMesh per body part → fixed draw calls) ----------
+const MAXP=220;
+function instPart(geo,sh){
+  const m=new THREE.InstancedMesh(geo,new THREE.MeshPhongMaterial({color:0xffffff,shininess:13}),MAXP);
+  m.castShadow=sh;m.receiveShadow=false;m.frustumCulled=false;
+  m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);scene.add(m);return m;
+}
+const iLegL=instPart(legGeo,1),iLegR=instPart(legGeo,1),iHip=instPart(hipGeo,1),
+      iTorso=instPart(torsoGeo,1),iArmL=instPart(armGeo,0),iArmR=instPart(armGeo,0),
+      iHead=instPart(headGeo,1),iHair=instPart(hairGeo,0);
+const CROWD=[iLegL,iLegR,iHip,iTorso,iArmL,iArmR,iHead,iHair];
+const _zero=new THREE.Matrix4().makeScale(0,0,0);
+for(let i=0;i<MAXP;i++)for(const m of CROWD)m.setMatrixAt(i,_zero);
+let colorsDirty=false;
+function setCrowdColor(i,skin,shirt,pants,hair){
+  iHead.setColorAt(i,skin);iHair.setColorAt(i,hair);
+  iTorso.setColorAt(i,shirt);iArmL.setColorAt(i,shirt);iArmR.setColorAt(i,shirt);
+  iHip.setColorAt(i,pants);iLegL.setColorAt(i,pants);iLegR.setColorAt(i,pants);
+  colorsDirty=true;
+}
+// scratch matrices reused every frame (no per-frame allocation)
+const _R=new THREE.Matrix4(),_J=new THREE.Matrix4(),_W=new THREE.Matrix4(),_Rx=new THREE.Matrix4(),
+      _q=new THREE.Quaternion(),_e=new THREE.Euler(),_pos=new THREE.Vector3(),_one=new THREE.Vector3(1,1,1);
+const _oTorso=new THREE.Matrix4().makeTranslation(0,REST.torso,0),
+      _oHip=new THREE.Matrix4().makeTranslation(0,REST.hip,0),
+      _oHead=new THREE.Matrix4().makeTranslation(0,REST.head,0),
+      _oHair=new THREE.Matrix4().makeTranslation(0,REST.hair,0),
+      _jLegL=new THREE.Matrix4().makeTranslation(...JOINT.legL),
+      _jLegR=new THREE.Matrix4().makeTranslation(...JOINT.legR),
+      _jArmL=new THREE.Matrix4().makeTranslation(...JOINT.armL),
+      _jArmR=new THREE.Matrix4().makeTranslation(...JOINT.armR);
+function _rigid(mesh,i,off){_W.multiplyMatrices(_R,off);mesh.setMatrixAt(i,_W);}
+function _limb(mesh,i,joint,swing){_Rx.makeRotationX(swing);_J.multiplyMatrices(joint,_Rx);_W.multiplyMatrices(_R,_J);mesh.setMatrixAt(i,_W);}
+function updateCrowd(){
+  for(let i=0;i<peds.length;i++){
+    const p=peds[i];
+    if(p.state==='down'){_e.set(1.5,p.dyaw,0);_pos.set(p.x,.3,p.z);}
+    else{_e.set(0,p.heading,0);_pos.set(p.x,p.bob,p.z);}
+    _q.setFromEuler(_e);_R.compose(_pos,_q,_one);
+    const sw=p.sw;
+    _limb(iLegL,i,_jLegL,sw*.6);_limb(iLegR,i,_jLegR,-sw*.6);
+    _limb(iArmL,i,_jArmL,-sw*.5);_limb(iArmR,i,_jArmR,sw*.5);
+    _rigid(iHip,i,_oHip);_rigid(iTorso,i,_oTorso);_rigid(iHead,i,_oHead);_rigid(iHair,i,_oHair);
+  }
+  for(const m of CROWD)m.instanceMatrix.needsUpdate=true;
+  if(colorsDirty){for(const m of CROWD)if(m.instanceColor)m.instanceColor.needsUpdate=true;colorsDirty=false;}
 }
 
 // ---------- audio ----------
@@ -481,7 +565,7 @@ const inp=()=>({
 let money=500,wanted=0,crimeCool=0,wantedTimer=0,playerHp=100;
 let tod=.32;
 const player={x:spawnX+5,z:spawnZ-4,vx:0,vz:0,heading:Math.PI/2,inCar:false,steer:0};
-const char=makePed(false);char.position.set(player.x,0,player.z);
+const char=buildCharacter(0xe8b88f,0x223a5e,0x222831,0x2b1b0e,false);scene.add(char);char.position.set(player.x,0,player.z);
 let vehicle=null,exitCool=0,dead=false;
 // you start on foot — your yellow car waits at the curb, a bike across the street
 const playerCar=makeCar(0xffcc00,false);playerCar.position.set(spawnX+LANE,0,spawnZ-7);
@@ -542,7 +626,7 @@ function spawnAI(forceBike){
   const bike=forceBike!==undefined?forceBike:Math.random()<.2;
   const color=pick([0xc0392b,0x2980b9,0x27ae60,0xe67e22,0x95a5a6,0x8e44ad,0xf1f1f1,0x2c3e50]);
   const m=bike?makeBike(color):makeCar(color,false);
-  const occupant=makePed(false);pose(occupant,true);
+  const occupant=buildOccupant(false);pose(occupant,true);
   if(bike){m.userData.lean.add(occupant);occupant.position.set(0,.5,-.3);}
   else{occupant.scale.setScalar(.85);occupant.position.set(-.45,.18,-.2);m.add(occupant);}
   const along=rnd(line.a+15,line.b-15);
@@ -580,9 +664,9 @@ function aiUpdate(ai,dtF){
   }
   for(const p of peds){
     if(p.state==='down')continue;
-    const gap=ai.axis==='z'?(p.mesh.position.z-pos)*ai.dir:(p.mesh.position.x-pos)*ai.dir;
+    const gap=ai.axis==='z'?(p.z-pos)*ai.dir:(p.x-pos)*ai.dir;
     if(gap<0||gap>9)continue;
-    const side=ai.axis==='z'?Math.abs(p.mesh.position.x-m.position.x):Math.abs(p.mesh.position.z-m.position.z);
+    const side=ai.axis==='z'?Math.abs(p.x-m.position.x):Math.abs(p.z-m.position.z);
     if(side<2.2)target=Math.min(target,gap<5?0:.12);
   }
   ai.cur+=M.clamp(target-ai.cur,-.05*dtF,.015*dtF);
@@ -610,59 +694,57 @@ function aiUpdate(ai,dtF){
 // ---------- pedestrians ----------
 const peds=[];
 function spawnPed(){
+  if(peds.length>=MAXP)return;
   const axis=Math.random()<.5?'z':'x';
   const line=axis==='z'?pick(cityX):pick(cityZ);
-  peds.push({mesh:makePed(false),axis,line,off:(Math.random()<.5?1:-1)*(HALF-1.4),
-    pos:rnd(line.a+12,line.b-12),dir:Math.random()<.5?1:-1,speed:rnd(.045,.075),
-    state:'walk',t:Math.random()*9,timer:0,local:false});
+  const off=(Math.random()<.5?1:-1)*(HALF-1.4),pos=rnd(line.a+12,line.b-12);
+  const i=peds.length;
+  peds.push({axis,line,off,pos,dir:Math.random()<.5?1:-1,speed:rnd(.045,.075),
+    state:'walk',t:Math.random()*9,timer:0,local:false,sw:0,bob:0,dyaw:0,heading:0,
+    x:axis==='z'?line.c+off:pos,z:axis==='z'?pos:line.c+off});
+  setCrowdColor(i,pick(SKIN),pick(SHIRT),pick(PANTS),pick(HAIR));
 }
-for(let i=0;i<70;i++)spawnPed();
+for(let i=0;i<130;i++)spawnPed();
 function downPed(p){
   if(p.state==='down')return;
-  p.state='down';p.timer=12;
-  p.mesh.rotation.z=Math.PI/2;p.mesh.rotation.y=Math.random()*7;p.mesh.position.y=.3;
-  spawnBlood(p.mesh.position);
+  p.state='down';p.timer=12;p.dyaw=Math.random()*7;p.sw=0;
+  spawnBlood({x:p.x,z:p.z});
 }
-function thrownPed(mesh,x,z){
-  mesh.rotation.set(0,Math.random()*7,Math.PI/2);mesh.position.set(x,.3,z);pose(mesh,false);
-  peds.push({mesh,axis:'z',line:cityX[midX],off:HALF-1.4,pos:z,dir:1,speed:.06,
-    state:'down',t:0,timer:2.5,local:true});
+// a driver thrown from a stolen vehicle becomes a crowd ped lying in the road
+function thrownPed(x,z){
+  let p,i;
+  if(peds.length<MAXP){i=peds.length;p={};peds.push(p);setCrowdColor(i,pick(SKIN),pick(SHIRT),pick(PANTS),pick(HAIR));}
+  else{i=0;let bd=-1;for(let k=0;k<peds.length;k++){const q=peds[k],dd=(q.x-player.x)**2+(q.z-player.z)**2;if(dd>bd){bd=dd;i=k;}}p=peds[i];}
+  Object.assign(p,{axis:'z',line:cityX[midX],off:HALF-1.4,x,z,pos:z,dir:1,speed:.06,
+    state:'down',t:0,timer:2.4,local:true,sw:0,bob:0,dyaw:Math.random()*7,heading:0});
 }
 function pedUpdate(p,dtF){
-  const m=p.mesh;
   if(p.state==='down'){
     p.timer-=dtF/60;
     if(p.timer<=0){
-      m.rotation.set(0,0,0);m.position.y=0;
       if(p.local){p.local=false;p.state='flee';p.timer=2.5;}
-      else{p.state='walk';
-        p.line=p.axis==='z'?pick(cityX):pick(cityZ);
+      else{p.state='walk';p.line=p.axis==='z'?pick(cityX):pick(cityZ);
         p.pos=rnd(p.line.a+12,p.line.b-12);
-        m.position.y=0;}
+        p.x=p.axis==='z'?p.line.c+p.off:p.pos;p.z=p.axis==='z'?p.pos:p.line.c+p.off;}
     }
-    return;
+    p.sw=0;p.bob=0;return;
   }
-  const dx=m.position.x-player.x,dz=m.position.z-player.z,d=Math.hypot(dx,dz);
+  const dx=p.x-player.x,dz=p.z-player.z,d=Math.hypot(dx,dz);
   const pSpeed=Math.hypot(player.vx,player.vz);
   if(p.state==='walk'&&d<9&&pSpeed>.3&&player.inCar){p.state='flee';p.timer=2.5;}
   if(p.state==='flee'){
     p.timer-=dtF/60;
     const ang=Math.atan2(dx,dz);
-    const pp={x:m.position.x+Math.sin(ang)*.16*dtF,z:m.position.z+Math.cos(ang)*.16*dtF,vx:0,vz:0};
-    resolveCircle(pp,.4);
-    m.position.x=pp.x;m.position.z=pp.z;
-    m.rotation.y=ang;p.t+=.4*dtF;
-    if(p.timer<=0){p.state='walk';
-      p.pos=p.axis==='z'?m.position.z:m.position.x;
-      p.off=(p.axis==='z'?m.position.x:m.position.z)-p.line.c;}
+    const pp={x:p.x+Math.sin(ang)*.16*dtF,z:p.z+Math.cos(ang)*.16*dtF,vx:0,vz:0};
+    resolveCircle(pp,.4);p.x=pp.x;p.z=pp.z;p.heading=ang;p.t+=.4*dtF;
+    if(p.timer<=0){p.state='walk';p.pos=p.axis==='z'?p.z:p.x;p.off=(p.axis==='z'?p.x:p.z)-p.line.c;}
   }else{
     p.pos+=p.dir*p.speed*dtF;p.t+=.18*dtF;
     if(p.pos>p.line.b-8||p.pos<p.line.a+8)p.dir*=-1;
-    if(p.axis==='z'){m.position.set(p.line.c+p.off,0,p.pos);m.rotation.y=p.dir>0?0:Math.PI;}
-    else{m.position.set(p.pos,0,p.line.c+p.off);m.rotation.y=p.dir>0?Math.PI/2:-Math.PI/2;}
+    if(p.axis==='z'){p.x=p.line.c+p.off;p.z=p.pos;p.heading=p.dir>0?0:Math.PI;}
+    else{p.x=p.pos;p.z=p.line.c+p.off;p.heading=p.dir>0?Math.PI/2:-Math.PI/2;}
   }
-  const s=Math.sin(p.t*6),L=m.userData.limbs;
-  L[0].rotation.x=s*.6;L[1].rotation.x=-s*.6;L[2].rotation.x=-s*.5;L[3].rotation.x=s*.5;
+  const sn=Math.sin(p.t*6);p.sw=sn;p.bob=Math.abs(sn)*.045;
   if(player.inCar&&vehicle&&d<(vehicle.userData.type==='bike'?1.4:1.9)&&pSpeed>.22){
     downPed(p);crashSound(.5);
     if(crimeCool<=0){addWanted(1);crimeCool=2;}
@@ -676,12 +758,12 @@ function spawnCop(){
   const m=makeCar(0x0d0d0d,true);
   m.position.set(M.clamp(player.x+Math.sin(ang)*d,-WORLD+20,WORLD-20),0,
                  M.clamp(player.z+Math.cos(ang)*d,-WORLD+20,WORLD-20));
-  const officer=makePed(true);pose(officer,true);officer.scale.setScalar(.85);
+  const officer=buildOccupant(true);pose(officer,true);officer.scale.setScalar(.85);
   officer.position.set(-.45,.18,-.2);m.add(officer);
   cops.push({mesh:m,vx:0,vz:0,heading:Math.random()*7,deployed:false,idx:cops.length});
 }
 function spawnFootCop(x,z){
-  footCops.push({mesh:(()=>{const m=makePed(true);m.position.set(x,0,z);return m;})(),t:rnd(.5,1.4),walk:0});
+  footCops.push({mesh:(()=>{const m=makeCiv(true);scene.add(m);m.position.set(x,0,z);return m;})(),t:rnd(.5,1.4),walk:0});
 }
 function addWanted(n){wanted=Math.min(5,wanted+n);wantedTimer=22;updateStars();}
 function updateStars(){
@@ -944,9 +1026,9 @@ function jackUpdate(dt,dtF){
   }else if(jack.phase==='pull'){
     if(jack.ai&&jack.ai.occupant){
       const occ=jack.ai.occupant;jack.ai.occupant=null;
-      scene.add(occ);occ.scale.setScalar(1);
+      if(occ.parent)occ.parent.remove(occ);
       const ox=dp.x-v.position.x,oz=dp.z-v.position.z,od=Math.hypot(ox,oz)||1;
-      thrownPed(occ,dp.x+ox/od*1.4,dp.z+oz/od*1.4);
+      thrownPed(dp.x+ox/od*1.4,dp.z+oz/od*1.4);
       crashSound(.35);
     }
     if(jack.t>.3){jack.phase='in';jack.t=0;}
@@ -1163,7 +1245,7 @@ function animate(){
       const bx=b.m.position.x,bz=b.m.position.z;
       if(Math.abs(bx)>WORLD||Math.abs(bz)>WORLD||pointInBuilding(bx,bz)){hit=true;break;}
       if(b.from==='player'){
-        for(const p of peds)if(p.state!=='down'&&Math.hypot(p.mesh.position.x-bx,p.mesh.position.z-bz)<1.1){
+        for(const p of peds)if(p.state!=='down'&&Math.hypot(p.x-bx,p.z-bz)<1.1){
           downPed(p);if(crimeCool<=0){addWanted(1);crimeCool=2;}hit=true;break;}
         if(hit)break;
         for(let fi=footCops.length-1;fi>=0;fi--){
@@ -1209,6 +1291,7 @@ function animate(){
   // --- world ---
   for(const a of aiCars)aiUpdate(a,dtF);
   for(const p of peds)pedUpdate(p,dtF);
+  updateCrowd();
   const nsS=lightState('z');
   for(const t of tlights){
     t.R.material.color.setHex(nsS==='R'?0xff2020:0x440000);

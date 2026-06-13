@@ -30,6 +30,9 @@ Needs internet on first load (three.js + font come from CDNs). Click or press an
 
 - **Asymmetric procedural city** — irregular road grid with partial dead-end streets,
   downtown / midtown / outskirts districts, parks; different layout every load
+- **Detailed characters & big crowds** — rounded low-poly humanoids (player, cops,
+  drivers, pedestrians); the civilian crowd is GPU-instanced (one draw call per body part)
+  so it scales to hundreds without tanking framerate
 - **On-foot + vehicles** — cars and motorcycles, all stealable with a proper jack
   sequence (door swings open, driver thrown to the street); drivers/riders are visible
   through glass cabins
