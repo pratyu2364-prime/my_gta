@@ -1,106 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grand Thief Auxto: Bharat Version</title>
-<style>
-  html,body{margin:0;padding:0;overflow:hidden;background:#000;font-family:Arial,Helvetica,sans-serif;user-select:none}
-  #c{position:fixed;inset:0}
-  .hud{position:fixed;z-index:10;pointer-events:none;color:#fff;text-shadow:1px 2px 2px #000}
-  #stats{top:14px;right:18px;text-align:right}
-  #money{font:italic 900 28px "Arial Black",Arial;color:#7cc576;letter-spacing:1px}
-  #clock{font:700 16px Arial;color:#e8e8e8;margin-top:2px}
-  #stars{font-size:22px;letter-spacing:3px;margin-top:2px}
-  #stars .on{color:#ffd23e}#stars .off{color:rgba(255,255,255,.25)}
-  #hpwrap{width:170px;height:12px;background:rgba(0,0,0,.55);border:2px solid rgba(255,255,255,.7);border-radius:3px;margin:6px 0 0 auto}
-  #hp{height:100%;width:100%;background:#3fa9f5;border-radius:1px;transition:width .15s}
-  #weapon{bottom:62px;right:22px;font:italic 900 19px "Arial Black",Arial;color:#ffd23e}
-  #speedo{bottom:18px;right:22px;font:italic 900 34px "Arial Black",Arial;color:#fff}
-  #speedo small{font-size:15px;color:#bbb}
-  #minimap{position:fixed;left:16px;bottom:16px;z-index:10;border-radius:50%;border:3px solid rgba(255,255,255,.85);box-shadow:0 4px 18px rgba(0,0,0,.6)}
-  #zone{position:fixed;left:24px;bottom:218px;z-index:10;font:italic 900 18px "Arial Black",Arial;color:#f7e8b0;text-shadow:1px 2px 3px #000;pointer-events:none}
-  #msg{top:9%;left:0;right:0;text-align:center;font:italic 900 30px "Arial Black",Arial;color:#ffd23e;opacity:0;transition:opacity .4s}
-  #prompt{bottom:23%;left:0;right:0;text-align:center;font:700 17px Arial;color:#fff;opacity:0;transition:opacity .2s}
-  #prompt b{color:#ffd23e}
-  .death{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;font:italic 900 90px "Arial Black",Arial;text-shadow:3px 5px 0 #000;letter-spacing:4px}
-  #wasted{background:rgba(60,0,0,.45);color:#c92b2b}
-  #busted{background:rgba(0,10,50,.5);color:#3f7fd8}
-  #bigmap{position:fixed;inset:0;z-index:30;display:none;background:rgba(5,8,14,.92);align-items:center;justify-content:center}
-  #intro{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 35%,#24344d,#070b12 75%);color:#fff;text-align:center;cursor:pointer}
-  #intro h1{font:italic 900 60px "Arial Black",Arial;color:#ffd23e;text-shadow:4px 5px 0 #b3531a,7px 9px 14px #000;margin:0 0 6px}
-  #intro h2{font:italic 700 19px Arial;color:#9fb6d8;margin:0 0 22px}
-  #intro table{margin:0 auto;color:#cfd8e6;font-size:14px;border-spacing:14px 4px;text-align:left}
-  #intro td:first-child{color:#ffd23e;font-weight:900}
-  #intro p{margin-top:24px;font:900 20px Arial;color:#fff;animation:bl 1.1s infinite}
-  @keyframes bl{50%{opacity:.25}}
-  #err{position:fixed;inset:0;z-index:99;display:none;background:#fff;color:#c0392b;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:30px}
-</style>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Russo+One&display=swap');
-  #money,#speedo,#weapon,#msg,#zone,.death,#intro h1{font-family:'Russo One','Arial Black',Arial,sans-serif!important;font-style:normal!important}
-  #stars.hot .on{animation:starpulse .55s infinite}
-  @keyframes starpulse{50%{text-shadow:0 0 14px #ffd23e,0 0 4px #fff}}
-  #vig{position:fixed;inset:0;z-index:25;pointer-events:none;background:radial-gradient(ellipse at center,transparent 52%,rgba(190,0,0,.6) 100%);opacity:0}
-  #xh{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:#fff;box-shadow:0 0 5px #000;z-index:12;display:none;pointer-events:none}
-  #obj{position:fixed;left:214px;bottom:24px;z-index:10;font:700 14px Arial;color:#ffd23e;text-shadow:1px 1px 2px #000;pointer-events:none}
-  #bubble{position:fixed;z-index:14;transform:translate(-50%,-100%);background:rgba(255,255,255,.96);color:#1a2330;font:600 14px Arial;padding:7px 12px;border-radius:12px;border:2px solid #1a2330;max-width:240px;text-align:center;pointer-events:none;display:none}
-  #bubble:after{content:'';position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);border:8px solid transparent;border-top-color:#1a2330}
-  #minimap{box-shadow:0 4px 18px rgba(0,0,0,.6),inset 0 0 30px rgba(0,0,0,.5)}
-  #hpwrap{box-shadow:0 2px 6px rgba(0,0,0,.5)}
-</style>
-<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-</head>
-<body>
-<div id="c"></div>
-<div id="err"><h1>Engine Error</h1><p id="errmsg"></p></div>
-<div id="intro">
-  <h1>GRAND THIEF AUXTO</h1>
-  <h2>Bharat Version &nbsp;•&nbsp; an open world crime sandbox</h2>
-  <table>
-    <tr><td>W A S D</td><td>drive / walk (camera-relative on foot)</td></tr>
-    <tr><td>MOUSE</td><td>look around &amp; aim — steers you on foot (click to lock)</td></tr>
-    <tr><td>SPACE</td><td>handbrake (drift!)</td></tr>
-    <tr><td>SHIFT</td><td>boost / sprint</td></tr>
-    <tr><td>E</td><td>enter / exit & steal cars, bikes and autos</td></tr>
-    <tr><td>T</td><td>talk to nearby people</td></tr>
-    <tr><td>CLICK / F</td><td>shoot (find gun pickups around the city)</td></tr>
-    <tr><td>Q</td><td>switch weapon</td></tr>
-    <tr><td>H</td><td>horn</td></tr>
-    <tr><td>M</td><td>city map</td></tr>
-  </table>
-  <p>CLICK OR PRESS ANY KEY TO START</p>
-</div>
-<div class="hud" id="stats">
-  <div id="money">$500</div>
-  <div id="clock">08:00</div>
-  <div id="stars"></div>
-  <div id="hpwrap"><div id="hp"></div></div>
-</div>
-<div class="hud" id="weapon">FISTS</div>
-<div class="hud" id="speedo">0 <small>km/h</small></div>
-<div class="hud" id="msg"></div>
-<div class="hud" id="prompt"></div>
-<div id="zone"></div>
-<div id="vig"></div>
-<div id="xh"></div>
-<div id="obj"></div>
-<div id="bubble"></div>
-<canvas id="minimap" width="190" height="190"></canvas>
-<div id="wasted" class="death">WASTED</div>
-<div id="busted" class="death">BUSTED</div>
-<div id="bigmap"><canvas id="bigmapc"></canvas></div>
+// GTA — Bharat Version. ESM entry (Phase 1 scaffold of the asset-pipeline refactor).
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-<script>
 function showError(m){document.getElementById('err').style.display='flex';document.getElementById('errmsg').textContent=m;}
-if(typeof THREE==='undefined'){showError('Three.js failed to load. Check your internet connection and reload.');}
-else{try{main();}catch(e){showError(e.message+'\n'+(e.stack||''));}}
+try{main();}catch(e){showError(e.message+'\n'+(e.stack||''));}
 
 function main(){
 'use strict';
@@ -170,10 +76,10 @@ document.getElementById('c').appendChild(renderer.domElement);
 scene.fog=new THREE.Fog(0x87ceeb,120,900);
 // ---------- post-processing: bloom + cinematic colour grade (degrades gracefully if CDN modules miss) ----------
 let composer=null,bloomPass=null;
-if(THREE.EffectComposer&&THREE.UnrealBloomPass&&THREE.RenderPass&&THREE.ShaderPass)try{
-  composer=new THREE.EffectComposer(renderer);
-  composer.addPass(new THREE.RenderPass(scene,camera));
-  bloomPass=new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),.55,.6,.82); // strength, radius, threshold
+if(EffectComposer&&UnrealBloomPass&&RenderPass&&ShaderPass)try{
+  composer=new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene,camera));
+  bloomPass=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),.55,.6,.82); // strength, radius, threshold
   composer.addPass(bloomPass);
   const GradeShader={
     uniforms:{tDiffuse:{value:null},sat:{value:.93},con:{value:1.09},vig:{value:.42}},
@@ -187,7 +93,7 @@ if(THREE.EffectComposer&&THREE.UnrealBloomPass&&THREE.RenderPass&&THREE.ShaderPa
       +'c=pow(clamp(c,0.0,1.0),vec3(1.0/2.2));'               // linear -> sRGB (composer target is linear)
       +'gl_FragColor=vec4(c,1.0);}'
   };
-  composer.addPass(new THREE.ShaderPass(GradeShader));
+  composer.addPass(new ShaderPass(GradeShader));
   composer.setSize(innerWidth,innerHeight);
 }catch(e){composer=null;}
 function renderFrame(){composer?composer.render():renderer.render(scene,camera);}
@@ -1901,6 +1807,3 @@ addEventListener('resize',()=>{
   if(bloomPass)bloomPass.setSize(innerWidth,innerHeight);
 });
 }
-</script>
-</body>
-</html>

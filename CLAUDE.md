@@ -2,9 +2,14 @@
 
 ## What this is
 
-A GTA-style open-world game in **one file: `gta_sim.html`** (~1100 lines). Plain three.js
-r128 loaded from unpkg CDN. No build step, no package.json, no modules — everything lives
-in a single `<script>` inside `main()`. Keep it that way unless the user asks otherwise.
+A GTA-style open-world game. As of the 2026-06-14 asset-pipeline refactor it is a small
+**static ES-module project** (NO build step): `index.html` is a thin shell (HUD DOM,
+loading screen, import map) that loads **`src/main.js`** (the game, currently still one
+large module inside `main()` — being split into `src/{core,world,entities,gameplay,ui}/`
+incrementally as each system is touched). three.js r128 + `examples/jsm` addons are
+pulled from the unpkg CDN via an **import map** (`three`, `three/addons/`). The design +
+phase plan live in `docs/superpowers/specs/2026-06-14-gta-asset-pipeline-refactor-design.md`.
+(History: it began as a single `gta_sim.html`; that file was removed in Phase 1.)
 
 ## Owner preferences
 
@@ -63,7 +68,10 @@ Harness lives in `/tmp/gta_test` (recreate if gone):
   and extract with `python3 -m zipfile -e` into `~/.cache/puppeteer/chrome-headless-shell/`.
 - `npm install puppeteer-core puppeteer` with `PUPPETEER_SKIP_DOWNLOAD=1`.
 - Launch args: `--no-sandbox --enable-unsafe-swiftshader --use-gl=angle --use-angle=swiftshader`.
-- Test pattern: load `file://…/gta_sim.html`, listen for `pageerror`/console errors, press
+- **ES modules need a server** (Chrome blocks `file://` fetch): run
+  `python3 -m http.server 8099` from the repo root and load `http://localhost:8099/index.html`.
+  Production (Pages, https) is unaffected. See `/tmp/gta_test/esm.js` for the current harness.
+- Test pattern: load the localhost URL, listen for `pageerror`/console/`requestfailed`, press
   a key to start, simulate KeyE/KeyW/KeyA, snapshot DOM HUD state
   (`#speedo, #prompt, #zone, #weapon`) and take screenshots, assert `NO JS ERRORS`.
 - Headless FPS is ~10, so allow 2× real-time for timed sequences (e.g. the carjack).
@@ -72,8 +80,8 @@ Harness lives in `/tmp/gta_test` (recreate if gone):
   even on a fatal init crash. Tests MUST also check
   `document.getElementById('err').style.display==='flex'` (and read `#errmsg`). A screenshot
   is the most reliable smoke test. (This is how the legless-occupant `pose()` null crash hid.)
-- Quick syntax check without a browser:
-  `node -e "new Function(require('fs').readFileSync('gta_sim.html','utf8').match(/<script>([\s\S]*?)<\/script>/g).pop().replace(/<\/?script>/g,''))"`.
+- Quick syntax check without a browser (ES module):
+  `cp src/main.js /tmp/c.mjs && node --check /tmp/c.mjs`.
 
 ## Conventions
 
