@@ -820,7 +820,9 @@ addEventListener('mousemove',e=>{
 });
 addEventListener('mousedown',()=>{if(started&&!bigOpen)firing=true;start();});
 addEventListener('mouseup',()=>firing=false);
-function start(){if(started)return;started=true;initAudio();document.getElementById('intro').style.display='none';}
+function start(){if(started)return;started=true;initAudio();document.getElementById('intro').style.display='none';
+  // grab pointer lock on start so the mouse gives unbounded 360° look (first click hits #intro, not the canvas)
+  if(canvasEl.requestPointerLock)canvasEl.requestPointerLock();}
 const inp=()=>({
   up:keys.KeyW||keys.ArrowUp, dn:keys.KeyS||keys.ArrowDown,
   lf:keys.KeyA||keys.ArrowLeft, rt:keys.KeyD||keys.ArrowRight,
