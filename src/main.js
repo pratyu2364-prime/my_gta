@@ -85,9 +85,11 @@ function markReady(){
 let booted=false;
 function runBoot(){if(booted)return;booted=true;boot();markReady();}   // spawn vehicles once GLB models are in
 const CARGLBS=['sedan','sedan-sports','hatchback-sports','suv','suv-luxury','taxi','van','race','police'];
+const TREEGLBS=['tree_default','tree_detailed','tree_pineRoundA','tree_palmDetailedTall'];
 Promise.all([
   assets.loadHDRI('./assets/hdri/sky_1k.hdr').then(env=>{scene.environment=env;}).catch(()=>{}),
-  ...CARGLBS.map(id=>assets.loadGLTF(id,`./assets/models/cars/${id}.glb`).catch(()=>{}))
+  ...CARGLBS.map(id=>assets.loadGLTF(id,`./assets/models/cars/${id}.glb`).catch(()=>{})),
+  ...TREEGLBS.map(id=>assets.loadGLTF(id,`./assets/models/nature/${id}.glb`).catch(()=>{}))
 ]).then(runBoot);
 setTimeout(runBoot,10000);     // never hard-block if the CDN/assets are slow or offline
 scene.fog=new THREE.Fog(0x87ceeb,120,900);
@@ -246,15 +248,8 @@ const treeGeoT=new THREE.CylinderGeometry(.35,.5,3.4,6);
 const treeGeoL=new THREE.SphereGeometry(2.4,7,6);
 const treeMatT=new THREE.MeshStandardMaterial({color:0x6b4a2e,roughness:.92,metalness:0});
 const treeMatL=new THREE.MeshStandardMaterial({color:0x2f6b2a,roughness:.9,metalness:0,envMapIntensity:.3});
-function addTree(x,z){
-  const t=new THREE.Mesh(treeGeoT,treeMatT);t.position.set(x,1.7,z);t.castShadow=true;scene.add(t);
-  const base=rnd(.85,1.25);
-  for(let k=0;k<2;k++){ // stacked canopy puffs → fuller, less lollipop
-    const l=new THREE.Mesh(treeGeoL,treeMatL);
-    l.position.set(x+rnd(-.4,.4),4.1+k*1.2,z+rnd(-.4,.4));
-    l.scale.setScalar(base*(1-k*.22));l.castShadow=true;scene.add(l);
-  }
-}
+const treeSpots=[];   // positions collected at init; instanced from GLB trees in boot() (after load)
+function addTree(x,z){treeSpots.push([x,z,rnd(.85,1.25)]);}
 // ---------- enterable landmarks (hospital / police / food court) ----------
 const landmarks=[];
 function signTexture(text,bg,fg){
@@ -418,19 +413,10 @@ if(river){
       cap.position.set(x,(h-6)-capH*.4,z);scene.add(cap);}
   }
 }
-{
-  // instanced forest belt in the outskirts (one draw call per part → stays scalable)
-  const FN=220;
-  const trunkI=new THREE.InstancedMesh(treeGeoT,treeMatT,FN), leafI=new THREE.InstancedMesh(treeGeoL,treeMatL,FN);
-  trunkI.castShadow=leafI.castShadow=true;scene.add(trunkI,leafI);
-  const _m=new THREE.Matrix4(),_p=new THREE.Vector3(),_q=new THREE.Quaternion(),_s=new THREE.Vector3();
-  for(let i=0;i<FN;i++){
-    const a=rnd(0,Math.PI*2), rad=rnd(WORLD-18,515), x=Math.cos(a)*rad, z=Math.sin(a)*rad, sc=rnd(.8,1.55);
-    _q.setFromAxisAngle(new THREE.Vector3(0,1,0),rnd(0,7));
-    _p.set(x,1.7*sc,z);_s.set(sc,sc,sc);_m.compose(_p,_q,_s);trunkI.setMatrixAt(i,_m);
-    _p.set(x,4.3*sc,z);_s.setScalar(sc*1.15);_m.compose(_p,_q,_s);leafI.setMatrixAt(i,_m);
-  }
-  trunkI.instanceMatrix.needsUpdate=leafI.instanceMatrix.needsUpdate=true;
+// forest belt in the outskirts — positions collected, instanced from GLB trees in boot()
+for(let i=0;i<240;i++){
+  const a=rnd(0,Math.PI*2), rad=rnd(WORLD-18,515);
+  treeSpots.push([Math.cos(a)*rad, Math.sin(a)*rad, rnd(.8,1.55)]);
 }
 
 // ---------- traffic lights ----------
@@ -951,6 +937,32 @@ function boot(){
   parked.push(playerCar,playerBike);
   for(let i=0;i<30;i++)spawnAI(false);
   for(let i=0;i<8;i++)spawnAI(true);
+  buildTrees();
+}
+// instance the collected tree spots from CC0 GLB trees (procedural fallback if models missing)
+function buildTrees(){
+  const _m=new THREE.Matrix4(),_p=new THREE.Vector3(),_q=new THREE.Quaternion(),_s=new THREE.Vector3(),_up=new THREE.Vector3(0,1,0);
+  const protos=TREEGLBS.map(id=>{const m=assets.spawn(id);let mesh=null;if(m)m.traverse(o=>{if(o.isMesh&&!mesh)mesh=o;});return mesh;}).filter(Boolean);
+  if(!protos.length){ // fallback to the old cylinder+sphere instancing
+    const n=treeSpots.length;
+    const trunkI=new THREE.InstancedMesh(treeGeoT,treeMatT,n),leafI=new THREE.InstancedMesh(treeGeoL,treeMatL,n);
+    trunkI.castShadow=leafI.castShadow=true;scene.add(trunkI,leafI);
+    treeSpots.forEach((sp,i)=>{const[x,z,sc]=sp;_q.setFromAxisAngle(_up,rnd(0,7));
+      _p.set(x,1.7*sc,z);_s.setScalar(sc);_m.compose(_p,_q,_s);trunkI.setMatrixAt(i,_m);
+      _p.set(x,4.3*sc,z);_s.setScalar(sc*1.15);_m.compose(_p,_q,_s);leafI.setMatrixAt(i,_m);});
+    trunkI.instanceMatrix.needsUpdate=leafI.instanceMatrix.needsUpdate=true;return;
+  }
+  const BASE=3.4;                       // GLB trees ~1.7u tall → ~5.8u
+  const buckets=protos.map(()=>[]);
+  for(const sp of treeSpots)buckets[(Math.random()*protos.length)|0].push(sp);
+  protos.forEach((mesh,ti)=>{
+    const spots=buckets[ti];if(!spots.length)return;
+    const inst=new THREE.InstancedMesh(mesh.geometry,mesh.material,spots.length);
+    inst.castShadow=true;scene.add(inst);
+    spots.forEach((sp,i)=>{const[x,z,sc]=sp;_q.setFromAxisAngle(_up,rnd(0,7));
+      _p.set(x,0,z);_s.setScalar(BASE*sc);_m.compose(_p,_q,_s);inst.setMatrixAt(i,_m);});
+    inst.instanceMatrix.needsUpdate=true;
+  });
 }
 // idle officers stationed inside each police station
 for(const Lm of landmarks)if(Lm.type==='police'){
