@@ -82,8 +82,14 @@ function markReady(){
   const p=document.querySelector('#intro p');if(p)p.textContent='CLICK OR PRESS ANY KEY TO START';
 }
 {const p=document.querySelector('#intro p');if(p)p.textContent='LOADING WORLD…';}
-assets.loadHDRI('./assets/hdri/sky_1k.hdr').then(env=>{scene.environment=env;markReady();}).catch(markReady);
-setTimeout(markReady,8000);   // never hard-block if the CDN/asset is slow or offline
+let booted=false;
+function runBoot(){if(booted)return;booted=true;boot();markReady();}   // spawn vehicles once GLB models are in
+const CARGLBS=['sedan','sedan-sports','hatchback-sports','suv','suv-luxury','taxi','van','race','police'];
+Promise.all([
+  assets.loadHDRI('./assets/hdri/sky_1k.hdr').then(env=>{scene.environment=env;}).catch(()=>{}),
+  ...CARGLBS.map(id=>assets.loadGLTF(id,`./assets/models/cars/${id}.glb`).catch(()=>{}))
+]).then(runBoot);
+setTimeout(runBoot,10000);     // never hard-block if the CDN/assets are slow or offline
 scene.fog=new THREE.Fog(0x87ceeb,120,900);
 // ---------- post-processing: bloom + cinematic colour grade (degrades gracefully if CDN modules miss) ----------
 let composer=null,bloomPass=null;
@@ -506,7 +512,31 @@ const headMat=new THREE.MeshStandardMaterial({color:0xfffdf0,emissive:0xfff6cc,e
 const tailMat=new THREE.MeshStandardMaterial({color:0x550000,emissive:0xff2200,emissiveIntensity:.4,roughness:.25,metalness:.1});
 const wheelGeo=new THREE.CylinderGeometry(.45,.45,.42,14);wheelGeo.rotateZ(Math.PI/2);
 const wheelMat=new THREE.MeshStandardMaterial({color:0x121212,roughness:.72,metalness:.22});
+const CAR_MODELS=['sedan','sedan-sports','hatchback-sports','suv','suv-luxury','taxi','van','race'];
+// GLB car (CC0 Kenney Car Kit) mapped onto the gameplay contract (wheels, beacons); falls back to procedural
 function makeCar(color,cop){
+  const model=assets.spawn(cop?'police':pick(CAR_MODELS));
+  if(!model)return makeCarProcedural(color,cop);
+  const g=new THREE.Group();
+  model.rotation.y=Math.PI;            // Kenney cars face -Z; flip to our +Z forward
+  model.scale.setScalar(1.9);
+  model.position.y=.57;                // lift wheels (bbox min y -0.3 * scale) onto the ground
+  const fronts=[],backs=[];
+  model.traverse(o=>{
+    if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material)o.material.envMapIntensity=.7;}
+    if(o.name&&o.name.indexOf('wheel')===0)(o.name.indexOf('front')>=0?fronts:backs).push(o);
+  });
+  g.add(model);                        // children[0] = model, so the lean/pitch tilt still works
+  const ud={wheels:[...fronts,...backs],hp:100,type:'car',rad:1.6,door:null};
+  if(cop){
+    const rl=new THREE.Mesh(new THREE.BoxGeometry(.5,.22,.4),new THREE.MeshStandardMaterial({color:0xff0000,emissive:0xff0000,emissiveIntensity:1}));
+    const bl=new THREE.Mesh(new THREE.BoxGeometry(.5,.22,.4),new THREE.MeshStandardMaterial({color:0x0044ff,emissive:0x0044ff,emissiveIntensity:1}));
+    rl.position.set(-.35,2.05,-.2);bl.position.set(.35,2.05,-.2);g.add(rl,bl);
+    ud.beacons=[rl,bl];
+  }
+  g.userData=ud;scene.add(g);return g;
+}
+function makeCarProcedural(color,cop){
   const g=new THREE.Group();
   const paint=new THREE.MeshStandardMaterial({color,roughness:.3,metalness:.6,envMapIntensity:1.1});
   const glass=new THREE.MeshStandardMaterial({color:0x0e151d,roughness:.05,metalness:.95,envMapIntensity:1.5,transparent:true,opacity:.6});
@@ -847,9 +877,7 @@ const player={x:spawnX+5,z:spawnZ-4,vx:0,vz:0,heading:Math.PI/2,inCar:false,stee
 const char=buildCharacter(0xe8b88f,0x223a5e,0x222831,0x2b1b0e,false);scene.add(char);char.position.set(player.x,0,player.z);
 let vehicle=null,exitCool=0,dead=false;
 // you start on foot — your yellow car waits at the curb, a bike across the street
-const playerCar=makeCar(0xffcc00,false);playerCar.position.set(spawnX+LANE,0,spawnZ-7);
-const playerBike=makeBike(0xcc2222);playerBike.position.set(spawnX-LANE-1,0,spawnZ+8);playerBike.rotation.y=Math.PI;
-const parked=[playerCar,playerBike];
+const parked=[];   // populated by boot() once vehicle GLB models have loaded
 
 // ---------- weapons ----------
 const WEAPONS={
@@ -916,8 +944,14 @@ function spawnAI(forceBike){
   m.rotation.y=axis==='z'?(dir>0?0:Math.PI):(dir>0?Math.PI/2:-Math.PI/2);
   aiCars.push({mesh:m,axis,dir,line,cur:0,base:rnd(.3,.5),occupant,jacked:false});
 }
-for(let i=0;i<30;i++)spawnAI(false);
-for(let i=0;i<8;i++)spawnAI(true);
+// vehicle spawns are deferred until GLB models load (called by runBoot, gated by start())
+function boot(){
+  const playerCar=makeCar(0xffcc00,false);playerCar.position.set(spawnX+LANE,0,spawnZ-7);
+  const playerBike=makeBike(0xcc2222);playerBike.position.set(spawnX-LANE-1,0,spawnZ+8);playerBike.rotation.y=Math.PI;
+  parked.push(playerCar,playerBike);
+  for(let i=0;i<30;i++)spawnAI(false);
+  for(let i=0;i<8;i++)spawnAI(true);
+}
 // idle officers stationed inside each police station
 for(const Lm of landmarks)if(Lm.type==='police'){
   for(let i=0;i<3;i++){const c=makeCiv(true);
