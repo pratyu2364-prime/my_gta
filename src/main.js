@@ -504,7 +504,7 @@ function makeCar(color,cop){
   const model=assets.spawn(cop?'police':pick(CAR_MODELS));
   if(!model)return makeCarProcedural(color,cop);
   const g=new THREE.Group();
-  model.rotation.y=Math.PI;            // Kenney cars face -Z; flip to our +Z forward
+  model.rotation.y=0;                  // Kenney Car Kit faces +Z = our forward (W drove backwards with the flip)
   model.scale.setScalar(1.9);
   model.position.y=.57;                // lift wheels (bbox min y -0.3 * scale) onto the ground
   const fronts=[],backs=[];
@@ -513,7 +513,12 @@ function makeCar(color,cop){
     if(o.name&&o.name.indexOf('wheel')===0)(o.name.indexOf('front')>=0?fronts:backs).push(o);
   });
   g.add(model);                        // children[0] = model, so the lean/pitch tilt still works
-  const ud={wheels:[...fronts,...backs],hp:100,type:'car',rad:1.6,door:null};
+  // procedural driver door (Kenney cars have none) so the carjack open/steal animation still plays
+  const doorGrp=new THREE.Group();
+  const dgeo=new THREE.BoxGeometry(.08,.82,1.5);dgeo.translate(0,0,-.75);   // pivot at the door's front edge
+  doorGrp.add(new THREE.Mesh(dgeo,new THREE.MeshStandardMaterial({color:0x20242b,roughness:.5,metalness:.4,envMapIntensity:.6})));
+  doorGrp.position.set(-1.3,.95,.55);g.add(doorGrp);
+  const ud={wheels:[...fronts,...backs],hp:100,type:'car',rad:1.6,door:doorGrp};
   if(cop){
     const rl=new THREE.Mesh(new THREE.BoxGeometry(.5,.22,.4),new THREE.MeshStandardMaterial({color:0xff0000,emissive:0xff0000,emissiveIntensity:1}));
     const bl=new THREE.Mesh(new THREE.BoxGeometry(.5,.22,.4),new THREE.MeshStandardMaterial({color:0x0044ff,emissive:0x0044ff,emissiveIntensity:1}));
@@ -941,9 +946,16 @@ function boot(){
 }
 // instance the collected tree spots from CC0 GLB trees (procedural fallback if models missing)
 function buildTrees(){
-  const _m=new THREE.Matrix4(),_p=new THREE.Vector3(),_q=new THREE.Quaternion(),_s=new THREE.Vector3(),_up=new THREE.Vector3(0,1,0);
-  const protos=TREEGLBS.map(id=>{const m=assets.spawn(id);let mesh=null;if(m)m.traverse(o=>{if(o.isMesh&&!mesh)mesh=o;});return mesh;}).filter(Boolean);
-  if(!protos.length){ // fallback to the old cylinder+sphere instancing
+  const _q=new THREE.Quaternion(),_p=new THREE.Vector3(),_s=new THREE.Vector3(),_up=new THREE.Vector3(0,1,0),
+        _spot=new THREE.Matrix4(),_full=new THREE.Matrix4(),_m=new THREE.Matrix4();
+  // each tree GLB has SEVERAL parts (trunk + foliage, distinct materials) — capture every mesh with its local transform
+  const types=[];
+  for(const id of TREEGLBS){
+    const root=assets.spawn(id);if(!root)continue;root.updateMatrixWorld(true);
+    const parts=[];root.traverse(o=>{if(o.isMesh){o.updateWorldMatrix(true,false);parts.push({geo:o.geometry,mat:o.material,lm:o.matrixWorld.clone()});}});
+    if(parts.length)types.push(parts);
+  }
+  if(!types.length){ // fallback to the old cylinder+sphere instancing
     const n=treeSpots.length;
     const trunkI=new THREE.InstancedMesh(treeGeoT,treeMatT,n),leafI=new THREE.InstancedMesh(treeGeoL,treeMatL,n);
     trunkI.castShadow=leafI.castShadow=true;scene.add(trunkI,leafI);
@@ -953,15 +965,14 @@ function buildTrees(){
     trunkI.instanceMatrix.needsUpdate=leafI.instanceMatrix.needsUpdate=true;return;
   }
   const BASE=3.4;                       // GLB trees ~1.7u tall → ~5.8u
-  const buckets=protos.map(()=>[]);
-  for(const sp of treeSpots)buckets[(Math.random()*protos.length)|0].push(sp);
-  protos.forEach((mesh,ti)=>{
+  const buckets=types.map(()=>[]);
+  for(const sp of treeSpots)buckets[(Math.random()*types.length)|0].push(sp);
+  types.forEach((parts,ti)=>{
     const spots=buckets[ti];if(!spots.length)return;
-    const inst=new THREE.InstancedMesh(mesh.geometry,mesh.material,spots.length);
-    inst.castShadow=true;scene.add(inst);
-    spots.forEach((sp,i)=>{const[x,z,sc]=sp;_q.setFromAxisAngle(_up,rnd(0,7));
-      _p.set(x,0,z);_s.setScalar(BASE*sc);_m.compose(_p,_q,_s);inst.setMatrixAt(i,_m);});
-    inst.instanceMatrix.needsUpdate=true;
+    const insts=parts.map(pt=>{const im=new THREE.InstancedMesh(pt.geo,pt.mat,spots.length);im.castShadow=true;scene.add(im);return im;});
+    spots.forEach((sp,i)=>{const[x,z,sc]=sp;_q.setFromAxisAngle(_up,rnd(0,7));_p.set(x,0,z);_s.setScalar(BASE*sc);_spot.compose(_p,_q,_s);
+      parts.forEach((pt,pi)=>{_full.multiplyMatrices(_spot,pt.lm);insts[pi].setMatrixAt(i,_full);});});
+    insts.forEach(im=>im.instanceMatrix.needsUpdate=true);
   });
 }
 // idle officers stationed inside each police station
@@ -1652,7 +1663,7 @@ function animate(){
     if(!player.inCar){
       const tp=findNearestPed(4.5);
       if(tp&&!talkingPed){const prm=document.getElementById('prompt');prm.innerHTML='Press <b>T</b> to talk';prm.style.opacity=1;}
-      if(talkReq&&tp){talkingPed=tp;tp.state='talk';tp.talkT=4.5;tp.line=pick(TALK);}
+      if(talkReq&&tp){talkingPed=tp;tp.state='talk';tp.talkT=4.5;tp.talkLine=pick(TALK);}  // NOT tp.line — that's the road-line object
     }
     talkReq=false;
   }
@@ -1829,7 +1840,7 @@ function animate(){
     const bub=document.getElementById('bubble');
     if(talkingPed&&talkingPed.state==='talk'){
       _pos.set(talkingPed.x,2.2,talkingPed.z).project(camera);
-      if(_pos.z<1){bub.textContent=talkingPed.line;bub.style.display='block';
+      if(_pos.z<1){bub.textContent=talkingPed.talkLine;bub.style.display='block';
         bub.style.left=((_pos.x*.5+.5)*innerWidth)+'px';bub.style.top=((-_pos.y*.5+.5)*innerHeight)+'px';}
       else bub.style.display='none';
     }else if(bub.style.display!=='none')bub.style.display='none';
