@@ -4,6 +4,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { AssetManager } from './core/assets.js';
 
 function showError(m){document.getElementById('err').style.display='flex';document.getElementById('errmsg').textContent=m;}
 try{main();}catch(e){showError(e.message+'\n'+(e.stack||''));}
@@ -73,6 +74,16 @@ document.getElementById('c').appendChild(renderer.domElement);
   const pmrem=new THREE.PMREMGenerator(renderer);pmrem.compileEquirectangularShader();
   scene.environment=pmrem.fromEquirectangular(et).texture;et.dispose();pmrem.dispose();
 }
+// asset pipeline: upgrade the procedural env to a real CC0 HDRI when it finishes loading
+const assets=new AssetManager(renderer);
+let assetsReady=false;
+function markReady(){
+  if(assetsReady)return;assetsReady=true;
+  const p=document.querySelector('#intro p');if(p)p.textContent='CLICK OR PRESS ANY KEY TO START';
+}
+{const p=document.querySelector('#intro p');if(p)p.textContent='LOADING WORLD…';}
+assets.loadHDRI('./assets/hdri/sky_1k.hdr').then(env=>{scene.environment=env;markReady();}).catch(markReady);
+setTimeout(markReady,8000);   // never hard-block if the CDN/asset is slow or offline
 scene.fog=new THREE.Fog(0x87ceeb,120,900);
 // ---------- post-processing: bloom + cinematic colour grade (degrades gracefully if CDN modules miss) ----------
 let composer=null,bloomPass=null;
@@ -820,7 +831,7 @@ addEventListener('mousemove',e=>{
 });
 addEventListener('mousedown',()=>{if(started&&!bigOpen)firing=true;start();});
 addEventListener('mouseup',()=>firing=false);
-function start(){if(started)return;started=true;initAudio();document.getElementById('intro').style.display='none';
+function start(){if(started||!assetsReady)return;started=true;initAudio();document.getElementById('intro').style.display='none';
   // grab pointer lock on start so the mouse gives unbounded 360° look (first click hits #intro, not the canvas)
   if(canvasEl.requestPointerLock)canvasEl.requestPointerLock();}
 const inp=()=>({
