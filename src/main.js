@@ -348,6 +348,23 @@ function buildLandmark(b,cfg){
   for(let i=0;i<cand.length&&chosen.length<3;i++)if(!chosen.includes(cand[i]))chosen.push(cand[i]);
   chosen.forEach((b,i)=>{b.special=true;buildLandmark(b,LM[i]);});
 }
+// reserve a clear building-free corridor (one block-row) for the elevated highway flyover,
+// far from spawn, so the structure never clips buildings and ramps land on open ground.
+const stuntZone={};
+{
+  let bj=-1,best=-1;
+  for(let j=0;j<cityZ.length-1;j++){
+    const cz=(cityZ[j].c+cityZ[j+1].c)/2,gap=cityZ[j+1].c-cityZ[j].c,far=Math.abs(cz-spawnZ);
+    if(gap<30||far<100)continue;
+    const score=gap+Math.min(far,260)*.5;
+    if(score>best){best=score;bj=j;}
+  }
+  if(bj<0)bj=cityZ.length-2;
+  const cz=(cityZ[bj].c+cityZ[bj+1].c)/2;
+  const half=Math.min((cityZ[bj+1].c-cityZ[bj].c)/2,26);
+  stuntZone.z=cz;stuntZone.x0=-WORLD+95;stuntZone.x1=WORLD-95;stuntZone.h=8;
+  for(const b of blocks)if(!b.special&&!b.river&&Math.abs(b.cz-cz)<half&&b.cx>stuntZone.x0-50&&b.cx<stuntZone.x1+50){b.special=true;b.stunt=true;}
+}
 
 for(const b of blocks){
   if(b.special||b.river)continue;
@@ -443,11 +460,15 @@ function inRiver(x,z){
 // ---------- elevated structures: highway flyover, stunt ramps (drivable height field) ----------
 // supports: deck = flat raised slab; ramp = linear incline along +x. groundHeightAt(x,z) = max support, else 0.
 const ramps=[],decks=[];
-function groundHeightAt(x,z){
+// height of the elevated surface at (x,z). maxReach (optional) = highest surface you can
+// actually step onto from your current height — surfaces ABOVE that (a deck overhead) are
+// ignored, so you drive UNDER a flyover instead of being teleported up onto it.
+function groundHeightAt(x,z,maxReach){
   let h=0;
-  for(const d of decks)if(x>=d.x0&&x<=d.x1&&z>=d.z0&&z<=d.z1)h=Math.max(h,d.h);
+  for(const d of decks)if(x>=d.x0&&x<=d.x1&&z>=d.z0&&z<=d.z1){if(maxReach===undefined||d.h<=maxReach)h=Math.max(h,d.h);}
   for(const r of ramps)if(x>=r.x0&&x<=r.x1&&z>=r.z0&&z<=r.z1){
-    const t=M.clamp((x-r.x0)/(r.x1-r.x0),0,1);h=Math.max(h,r.h0+(r.h1-r.h0)*t);
+    const t=M.clamp((x-r.x0)/(r.x1-r.x0),0,1),rh=r.h0+(r.h1-r.h0)*t;
+    if(maxReach===undefined||rh<=maxReach)h=Math.max(h,rh);
   }
   return h;
 }
@@ -489,10 +510,17 @@ function buildStuntRamp(cx,cz,len,wid,H,faceMaxX){
   const w=new THREE.Mesh(makeWedge(len,wid,H,faceMaxX),rampMat);w.position.set(x0,0,cz);w.castShadow=w.receiveShadow=true;scene.add(w);
   ramps.push({x0,x1,z0,z1,h0:faceMaxX?0:H,h1:faceMaxX?H:0});
 }
-// place a highway flyover in the open outskirts + a couple of stunt kickers near the action
-buildFlyover(spawnX, spawnZ-Math.min(150,WORLD-120), 150, 16, 9, 30);
-buildStuntRamp(spawnX+34, spawnZ+24, 14, 9, 3.2, true);
-buildStuntRamp(spawnX-40, spawnZ-30, 14, 9, 3.0, false);
+// elevated highway flyover down the reserved (building-free) corridor; ramps land on open ground
+buildFlyover((stuntZone.x0+stuntZone.x1)/2, stuntZone.z, stuntZone.x1-stuntZone.x0, 16, stuntZone.h, 34);
+// stunt kickers placed inside parks (grass, never on roads or in buildings)
+{
+  const parks=blocks.filter(b=>b.park&&!b.special&&(b.x1-b.x0)>22&&(b.z1-b.z0)>16)
+    .sort((a,b)=>Math.hypot(b.cx-spawnX,b.cz-spawnZ)-Math.hypot(a.cx-spawnX,a.cz-spawnZ));
+  let n=0;
+  for(const b of parks){if(n>=3)break;
+    const len=Math.min(15,(b.x1-b.x0)-6);
+    buildStuntRamp(b.cx,b.cz,len,9,rnd(2.6,3.4),Math.random()<.5);n++;}
+}
 
 {
   // distant mountain ring (decorative, beyond the playable area → no colliders)
@@ -646,7 +674,8 @@ const wheelMat=new THREE.MeshStandardMaterial({color:0x121212,roughness:.72,meta
 const CAR_MODELS=['sedan','sedan-sports','hatchback-sports','suv','suv-luxury','taxi','van','race'];
 // GLB car (CC0 Kenney Car Kit) mapped onto the gameplay contract (wheels, beacons); falls back to procedural
 function makeCar(color,cop,forceModel){
-  const model=assets.spawn(cop?'police':(forceModel||pick(CAR_MODELS)));
+  const id=cop?'police':(forceModel||pick(CAR_MODELS));
+  const model=assets.spawn(id);
   if(!model)return makeCarProcedural(color,cop,forceModel);
   const g=new THREE.Group();
   model.rotation.y=0;                  // Kenney Car Kit faces +Z = our forward (W drove backwards with the flip)
@@ -658,11 +687,15 @@ function makeCar(color,cop,forceModel){
     if(o.name&&o.name.indexOf('wheel')===0)(o.name.indexOf('front')>=0?fronts:backs).push(o);
   });
   g.add(model);                        // children[0] = model, so the lean/pitch tilt still works
-  // procedural driver door (Kenney cars have none) so the carjack open/steal animation still plays
-  const doorGrp=new THREE.Group();
-  const dgeo=new THREE.BoxGeometry(.08,.82,1.5);dgeo.translate(0,0,-.75);   // pivot at the door's front edge
-  doorGrp.add(new THREE.Mesh(dgeo,new THREE.MeshStandardMaterial({color:0x20242b,roughness:.5,metalness:.4,envMapIntensity:.6})));
-  doorGrp.position.set(-1.3,.95,.55);g.add(doorGrp);
+  // procedural driver door (Kenney cars have none) so the carjack open/steal animation can play —
+  // but open-cockpit styles (race) don't get one
+  let doorGrp=null;
+  if(id!=='race'){
+    doorGrp=new THREE.Group();
+    const dgeo=new THREE.BoxGeometry(.08,.82,1.5);dgeo.translate(0,0,-.75);   // pivot at the door's front edge
+    doorGrp.add(new THREE.Mesh(dgeo,new THREE.MeshStandardMaterial({color:0x20242b,roughness:.5,metalness:.4,envMapIntensity:.6})));
+    doorGrp.position.set(-1.3,.95,.55);g.add(doorGrp);
+  }
   const ud={wheels:[...fronts,...backs],hp:100,type:'car',rad:1.6,door:doorGrp};
   if(forceModel==='taxi')ud.taxi=true;
   if(cop){
@@ -1043,7 +1076,7 @@ const inp=()=>({
 // ---------- game state ----------
 let money=500,wanted=0,crimeCool=0,wantedTimer=0,playerHp=100;
 let tod=.32;
-const player={x:spawnX+5,z:spawnZ-4,vx:0,vz:0,vy:0,y:0,heading:Math.PI/2,inCar:false,steer:0,airborne:false,meleeAnim:0,jumpHeld:false};
+const player={x:spawnX+5,z:spawnZ-4,vx:0,vz:0,vy:0,y:0,climbV:0,heading:Math.PI/2,inCar:false,steer:0,airborne:false,meleeAnim:0,jumpHeld:false};
 const char=buildCharacter(0xe8b88f,0x223a5e,0x222831,0x2b1b0e,false);scene.add(char);char.position.set(player.x,0,player.z);
 let vehicle=null,exitCool=0,dead=false;
 // you start on foot — your yellow car waits at the curb, a bike across the street
@@ -1575,10 +1608,11 @@ function resolveActors(p,r){
 // roof height of a vehicle by type (for jumping on top of cars)
 function carTop(m){const t=m.userData.type;return t==='bike'?1.05:t==='auto'?1.7:1.95;}
 // support height under the on-foot player: terrain/ramps/decks + roofs of cars & props you can stand on
-function footSupport(x,z){
-  let h=groundHeightAt(x,z),car=null;
+function footSupport(x,z,curY){
+  if(curY===undefined)curY=player.y;
+  let h=groundHeightAt(x,z,curY+0.6),car=null;
   const onCar=(m)=>{if(m.userData.dead)return;const top=m.position.y+carTop(m);
-    if(Math.abs(x-m.position.x)<1.5&&Math.abs(z-m.position.z)<2.5&&top>h&&player.y>=top-.55){h=top;car=m;}};
+    if(Math.abs(x-m.position.x)<1.5&&Math.abs(z-m.position.z)<2.5&&top>h&&curY>=top-.55){h=top;car=m;}};
   for(const a of aiCars)onCar(a.mesh);
   for(const c of cops)onCar(c.mesh);
   for(const v of parked)onCar(v);
@@ -1746,7 +1780,7 @@ function damageVehicle(n){
 }
 function respawn(){
   dead=false;playerHp=100;
-  player.x=spawnX+5;player.z=spawnZ-4;player.vx=player.vz=0;player.vy=0;player.y=0;player.airborne=false;player.heading=Math.PI/2;
+  player.x=spawnX+5;player.z=spawnZ-4;player.vx=player.vz=0;player.vy=0;player.y=0;player.climbV=0;player.airborne=false;player.heading=Math.PI/2;
   player.inCar=false;vehicle=null;
   scene.add(char);char.visible=true;char.scale.setScalar(1);pose(char,false);
   char.position.set(player.x,0,player.z);char.rotation.set(0,player.heading,0);
@@ -1814,7 +1848,7 @@ function finishJack(){
   const pIdx=parked.indexOf(near);if(pIdx>=0)parked.splice(pIdx,1);
   vehicle=near;player.inCar=true;
   player.x=near.position.x;player.z=near.position.z;
-  player.heading=near.rotation.y;player.vx=player.vz=0;player.vy=0;player.y=near.position.y||0;player.airborne=false;
+  player.heading=near.rotation.y;player.vx=player.vz=0;player.vy=0;player.climbV=0;player.y=near.position.y||0;player.airborne=false;
   mountChar(near);exitCool=.6;jack=null;
 }
 function jackUpdate(dt,dtF){
@@ -1877,7 +1911,7 @@ function handleEnterExit(dtF){
       const fx=Math.sin(player.heading),fz=Math.cos(player.heading);
       const veh=vehicle;
       player.x=veh.position.x-fz*2.6;player.z=veh.position.z+fx*2.6;
-      player.vx=player.vz=0;player.vy=0;player.y=0;player.airborne=false;
+      player.vx=player.vz=0;player.vy=0;player.y=0;player.climbV=0;player.airborne=false;
       if(!parked.includes(veh))parked.push(veh);
       dismountChar();openDoor(veh,perf+.8);vehicle=null;
     }
@@ -2013,21 +2047,30 @@ function animate(){
       if(inRiver(vehicle.position.x,vehicle.position.z))player.vz+=river.flow*river.flowSpeed*dtF; // current carries you
       const rad=vehicle.userData.rad;
       const pp={x:vehicle.position.x+player.vx*dtF,z:vehicle.position.z+player.vz*dtF,vx:player.vx,vz:player.vz};
-      const imp=player.airborne?0:resolveCircle(pp,rad);  // no wall hits while in the air over a ramp
+      const imp=(player.airborne||player.y>3)?0:resolveCircle(pp,rad);  // no ground collisions while airborne or up on the flyover/ramp
       player.vx=pp.vx;player.vz=pp.vz;
       pp.x=M.clamp(pp.x,-WORLD+4,WORLD-4);pp.z=M.clamp(pp.z,-WORLD+4,WORLD-4);
-      // vertical: climb ramps, launch off the lip, gravity drops you back onto the height field
-      const gh=groundHeightAt(pp.x,pp.z);
-      if(gh>player.y)player.vy=Math.max(player.vy,(gh-player.y)/Math.max(dt,.001)*.9);
-      player.vy-=26*dt;player.y+=player.vy*dt;
-      let landed=false;
-      if(player.y<=gh){if(player.vy<-6)landed=true;player.y=gh;if(player.vy<0)player.vy=0;player.airborne=false;}
-      else player.airborne=true;
+      // --- vertical: climb ramps gradually, launch off the lip, fall under gravity ---
+      // reachability gate (groundHeightAt with maxReach) means a deck overhead can never yank you skyward.
+      let landImpact=0;
+      if(!player.airborne){
+        const surf=groundHeightAt(pp.x,pp.z,player.y+0.7);
+        if(surf>player.y+0.001){player.climbV=M.clamp((surf-player.y)/Math.max(dt,.016),0,16);player.y=surf;player.vy=0;}
+        else if(surf<player.y-0.06){player.vy=player.climbV||0;player.airborne=true;player.climbV=0;}  // left the lip → launch
+        else{player.y=surf;player.vy=0;player.climbV=0;}
+      }
+      if(player.airborne){
+        player.vy=Math.max(player.vy-26*dt,-45);player.y+=player.vy*dt;
+        const land=groundHeightAt(pp.x,pp.z,player.y+0.7);
+        if(player.y<=land){landImpact=player.vy;player.y=land;player.vy=0;player.airborne=false;player.climbV=0;}
+      }
+      if(!isFinite(player.y)){player.y=0;player.vy=0;player.airborne=false;player.climbV=0;}  // hard NaN guard
+      player.y=M.clamp(player.y,0,40);
       vehicle.position.set(pp.x,player.y,pp.z);
       vehicle.rotation.y=player.heading;
       player.x=pp.x;player.z=pp.z;
       if(imp>.15){damageVehicle(imp*26);crashSound(imp);sparks(vehicle.position);}
-      if(landed){damageVehicle(Math.min(18,-player.vy*1.2));crashSound(.6);sparks(vehicle.position);player.vy=0;}
+      if(landImpact<-6){damageVehicle(Math.min(18,-landImpact*1.2));crashSound(.6);sparks(vehicle.position);}
       if(bike){
         vehicle.userData.lean.rotation.z=M.lerp(vehicle.userData.lean.rotation.z,-player.steer*Math.min(1,Math.abs(vf))*.45,.15);
       }else{
@@ -2079,12 +2122,14 @@ function animate(){
       player.x=M.clamp(pp.x,-WORLD+2,WORLD-2);player.z=M.clamp(pp.z,-WORLD+2,WORLD-2);
       player.vx=pp.vx;player.vz=pp.vz;
       // --- vertical: jump (Space) / gravity / land + stand on terrain, cars & props ---
-      const sup=footSupport(player.x,player.z);
+      const sup=footSupport(player.x,player.z,player.y);
       if(player.y<=sup.h+.05){player.y=sup.h;if(player.vy<0)player.vy=0;
         if(k.hb&&!player.jumpHeld)player.vy=8.6;}     // jump off whatever supports you (units/sec)
       player.jumpHeld=k.hb;
-      player.vy-=24*dt;player.y+=player.vy*dt;
+      player.vy=Math.max(player.vy-24*dt,-45);player.y+=player.vy*dt;
       if(player.y<sup.h){player.y=sup.h;player.vy=0;}
+      if(!isFinite(player.y)){player.y=0;player.vy=0;}     // NaN guard
+      player.y=M.clamp(player.y,0,40);
       player.airborne=player.y>sup.h+.03;
       if(sup.car&&!player.airborne){if(player._rx!==undefined){player.x+=sup.car.position.x-player._rx;player.z+=sup.car.position.z-player._rz;}player._rx=sup.car.position.x;player._rz=sup.car.position.z;}
       else player._rx=undefined;
