@@ -89,8 +89,16 @@ window.__probe=()=>{const st={parked:parked.length,ai:aiCars.length};
     st.owned=owned.slice();st.patrols=aiCars.filter(a=>a.police).length;st.copWalkers=copWalkers.length;
     st.wanted=wanted;st.parkedPolice=parked.filter(v=>v.userData&&v.userData.beacons).length;
     st.taxiActive=taxi.active;st.taxiPhase=taxi.phase;st.taxiRoute=taxi.route?taxi.route.length:0;st.taxiTraveled=+taxi.traveled.toFixed(1);st.paidFare=taxi.paidFare;
-    st.parkedTaxi=parked.filter(v=>v.userData&&v.userData.taxi).length;st.money=money;}catch(e){st.probeErr=e.message;}
+    st.parkedTaxi=parked.filter(v=>v.userData&&v.userData.taxi).length;st.money=money;
+    const plane=parked.find(v=>v.userData.type==='plane');st.planes=parked.filter(v=>v.userData.type==='plane').length;
+    if(plane){const pb=new THREE.Box3().setFromObject(plane);st.planeMinY=+pb.min.y.toFixed(3);st.planeY=+plane.position.y.toFixed(2);}
+    st.airportCx=airport?+airport.cx.toFixed(0):null;st.airportCz=airport?+airport.cz.toFixed(0):null;
+    st.inCar=player.inCar;st.vehType=vehicle?vehicle.userData.type:null;st.inPlane=player.inCar&&vehicle&&vehicle.userData.type==='plane';
+    const _wd=new THREE.Vector3();camera.getWorldDirection(_wd);st.camY=+camera.position.y.toFixed(2);st.camDirY=+_wd.y.toFixed(3);st.camPitch=+camPitch.toFixed(3);}catch(e){st.probeErr=e.message;}
   return st;}; // TEMP
+window.__tp=(x,z)=>{player.x=x;player.z=z;if(!player.inCar){player.y=0;player.vy=0;}}; // TEMP test teleport
+window.__cam=(p,y)=>{camPitch=p;if(y!==undefined)camYaw=y;}; // TEMP force camera pitch/yaw
+window.__hdg=()=>+player.heading.toFixed(3); // TEMP
 let assetsReady=false;
 function markReady(){
   if(assetsReady)return;assetsReady=true;
@@ -364,6 +372,39 @@ const stuntZone={};
   const half=Math.min((cityZ[bj+1].c-cityZ[bj].c)/2,26);
   stuntZone.z=cz;stuntZone.x0=-WORLD+95;stuntZone.x1=WORLD-95;stuntZone.h=8;
   for(const b of blocks)if(!b.special&&!b.river&&Math.abs(b.cz-cz)<half&&b.cx>stuntZone.x0-50&&b.cx<stuntZone.x1+50){b.special=true;b.stunt=true;}
+}
+// ---------- airport: a flat reserved airfield (runway along x) in the corner furthest from spawn ----------
+const airport={};
+{
+  airport.cx=(spawnX>0?-1:1)*(WORLD-185);
+  airport.cz=(spawnZ>0?-1:1)*(WORLD-185);
+  airport.hw=115;airport.hd=40;
+  airport.x0=airport.cx-airport.hw;airport.x1=airport.cx+airport.hw;
+  airport.z0=airport.cz-airport.hd;airport.z1=airport.cz+airport.hd;
+  // keep every building out of the airfield (reserve overlapping blocks before the building loop runs)
+  for(const b of blocks)if(!b.special&&!b.river&&b.x1>airport.x0-6&&b.x0<airport.x1+6&&b.z1>airport.z0-6&&b.z0<airport.z1+6){b.special=true;b.airport=true;}
+  // apron + runway surface (thin slabs just above the ground texture)
+  const apron=new THREE.Mesh(new THREE.BoxGeometry(airport.hw*2,.12,airport.hd*2),new THREE.MeshStandardMaterial({color:0x3a4048,roughness:.95,metalness:.04}));
+  apron.position.set(airport.cx,.06,airport.cz);apron.receiveShadow=true;scene.add(apron);
+  const runway=new THREE.Mesh(new THREE.BoxGeometry(airport.hw*2-14,.14,26),new THREE.MeshStandardMaterial({color:0x23272e,roughness:.98,metalness:.03}));
+  runway.position.set(airport.cx,.1,airport.cz);runway.receiveShadow=true;scene.add(runway);
+  const lineMat=new THREE.MeshStandardMaterial({color:0xf2f2f2,roughness:.7,emissive:0x222222});
+  for(let x=-airport.hw+18;x<airport.hw-18;x+=14){const d=new THREE.Mesh(new THREE.BoxGeometry(7,.02,.8),lineMat);d.position.set(airport.cx+x,.18,airport.cz);scene.add(d);}
+  for(const ex of [-airport.hw+10,airport.hw-10])for(let i=-3;i<=3;i++){const t=new THREE.Mesh(new THREE.BoxGeometry(3,.02,1.0),lineMat);t.position.set(airport.cx+ex,.18,airport.cz+i*2.2);scene.add(t);}
+  // terminal/hangar on the +z edge (solid) with a curved roof, plus a control tower
+  const tz=airport.cz+airport.hd-9,tw=70,td=14;
+  const term=new THREE.Mesh(new THREE.BoxGeometry(tw,11,td),new THREE.MeshStandardMaterial({color:0x6b7480,roughness:.7,metalness:.2}));
+  term.position.set(airport.cx,5.5,tz);term.castShadow=term.receiveShadow=true;scene.add(term);
+  colliders.push({x0:airport.cx-tw/2,x1:airport.cx+tw/2,z0:tz-td/2,z1:tz+td/2});
+  const roofA=new THREE.Mesh(new THREE.CylinderGeometry(8,8,tw,16,1,false,0,Math.PI),new THREE.MeshStandardMaterial({color:0x9aa3ad,roughness:.6,metalness:.3}));
+  roofA.rotation.z=Math.PI/2;roofA.position.set(airport.cx,11,tz);roofA.castShadow=true;scene.add(roofA);
+  const tx2=airport.cx-airport.hw+14;
+  const tower=new THREE.Mesh(new THREE.BoxGeometry(6,20,6),new THREE.MeshStandardMaterial({color:0x8a929c,roughness:.7,metalness:.2}));
+  tower.position.set(tx2,10,tz);tower.castShadow=true;scene.add(tower);
+  colliders.push({x0:tx2-3,x1:tx2+3,z0:tz-3,z1:tz+3});
+  const cab=new THREE.Mesh(new THREE.BoxGeometry(9,4,9),new THREE.MeshStandardMaterial({color:0x1a2230,roughness:.1,metalness:.6,transparent:true,opacity:.7}));
+  cab.position.set(tx2,21,tz);scene.add(cab);
+  const bcn=new THREE.PointLight(0xff4444,1.0,70);bcn.position.set(tx2,24,tz);scene.add(bcn);airport.beacon=bcn;
 }
 
 for(const b of blocks){
@@ -680,7 +721,10 @@ function makeCar(color,cop,forceModel){
   const g=new THREE.Group();
   model.rotation.y=0;                  // Kenney Car Kit faces +Z = our forward (W drove backwards with the flip)
   model.scale.setScalar(1.9);
-  model.position.y=.57;                // lift wheels (bbox min y -0.3 * scale) onto the ground
+  // each Kenney model has a different wheel-bottom, so a single lift floats some & sinks others —
+  // measure the scaled bbox and drop the lowest point exactly onto y=0
+  const _bb=new THREE.Box3().setFromObject(model);
+  model.position.y=isFinite(_bb.min.y)?-_bb.min.y:.57;
   const fronts=[],backs=[];
   model.traverse(o=>{
     if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material)o.material.envMapIntensity=.7;}
@@ -768,6 +812,28 @@ function makeBike(color){
   const hl=new THREE.Mesh(new THREE.BoxGeometry(.2,.18,.08),headMat);hl.position.set(0,.95,1.05);lean.add(hl);
   const tl=new THREE.Mesh(new THREE.BoxGeometry(.18,.12,.06),tailMat);tl.position.set(0,.72,-1.05);lean.add(tl);
   g.userData={wheels,hp:55,type:'bike',rad:1.0,lean,paint};
+  scene.add(g);return g;
+}
+function makePlane(color){   // light propeller plane (flyable) — nose at +z = our forward
+  const g=new THREE.Group();
+  const body=new THREE.MeshStandardMaterial({color,roughness:.4,metalness:.5,envMapIntensity:1}),
+        dark=new THREE.MeshStandardMaterial({color:0x222831,roughness:.5,metalness:.5}),
+        glass=new THREE.MeshStandardMaterial({color:0x0e151d,roughness:.05,metalness:.95,transparent:true,opacity:.6});
+  const fus=new THREE.Mesh(new THREE.CylinderGeometry(.55,.42,6,12),body);fus.rotation.x=Math.PI/2;fus.position.y=1.4;fus.castShadow=true;g.add(fus);
+  const nose=new THREE.Mesh(new THREE.ConeGeometry(.55,1.4,12),body);nose.rotation.x=-Math.PI/2;nose.position.set(0,1.4,3.3);g.add(nose);
+  const cock=new THREE.Mesh(new THREE.SphereGeometry(.5,12,8),glass);cock.scale.set(1,.7,1.3);cock.position.set(0,1.85,1.2);g.add(cock);
+  const wing=new THREE.Mesh(new THREE.BoxGeometry(9,.16,1.5),body);wing.position.set(0,1.45,.4);wing.castShadow=true;g.add(wing);
+  const tailH=new THREE.Mesh(new THREE.BoxGeometry(3.2,.14,1.0),body);tailH.position.set(0,1.5,-2.7);g.add(tailH);
+  const tailV=new THREE.Mesh(new THREE.BoxGeometry(.14,1.6,1.1),body);tailV.position.set(0,2.2,-2.7);tailV.castShadow=true;g.add(tailV);
+  const prop=new THREE.Group();
+  prop.add(new THREE.Mesh(new THREE.BoxGeometry(.18,2.6,.1),dark));
+  prop.add(new THREE.Mesh(new THREE.BoxGeometry(2.6,.18,.1),dark));
+  prop.position.set(0,1.4,4.0);g.add(prop);
+  const wheelMat=new THREE.MeshStandardMaterial({color:0x14171b,roughness:.8});
+  const mkWheel=(x,z)=>{const w=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.24,12),wheelMat);w.rotation.z=Math.PI/2;w.position.set(x,.34,z);g.add(w);
+    const strut=new THREE.Mesh(new THREE.BoxGeometry(.12,1.0,.12),dark);strut.position.set(x,.85,z);g.add(strut);return w;};
+  const wheels=[mkWheel(-1.6,.6),mkWheel(1.6,.6),mkWheel(0,-2.4)];
+  g.userData={wheels,hp:90,type:'plane',rad:3.2,prop,thr:0,roll:0,pitch:0};
   scene.add(g);return g;
 }
 function makeRickshaw(){   // Bharat auto-rickshaw (3-wheeler)
@@ -1166,6 +1232,9 @@ function boot(){
   {const sign=new THREE.Mesh(new THREE.BoxGeometry(.5,.3,1.0),new THREE.MeshStandardMaterial({color:0xffd23e,emissive:0xffb000,emissiveIntensity:.5}));sign.position.set(0,2.15,-.1);playerCar.add(sign);}
   const playerBike=makeBike(0xcc2222);playerBike.position.set(spawnX-LANE-1,0,spawnZ+8);playerBike.rotation.y=Math.PI;
   parked.push(playerCar,playerBike);
+  // parked planes lined up on the runway (face +x, down the runway)
+  for(let i=0;i<2;i++){const pl=makePlane(pick([0xecf0f1,0xc0392b]));
+    pl.position.set(airport.cx-45+i*55,0,airport.cz);pl.rotation.y=Math.PI/2;parked.push(pl);}
   for(let i=0;i<42;i++)spawnAI(false);
   for(let i=0;i<11;i++)spawnAI(true);
   for(let i=0;i<4;i++)spawnPatrol();                 // ambient patrol cruisers in traffic
@@ -1813,6 +1882,12 @@ function mountChar(v){
     v.userData.lean.add(char);
     char.position.set(0,.5,-.3);char.rotation.set(0,0,0);char.scale.setScalar(1);
     pose(char,true);char.visible=true;
+  }else if(v.userData.type==='plane'){ // seated in the cockpit
+    v.add(char);
+    char.position.set(0,1.2,.9);char.rotation.set(0,0,0);char.scale.setScalar(.8);
+    pose(char,true);char.visible=true;
+    v.userData.thr=0;v.userData.spd=0;camPitch=0;camYaw=0;            // neutral, level start
+    showMsg('✈ Mouse = steer · W = throttle · S = brake · A/D = roll');
   }else{ // visible through the glass cabin
     v.add(char);
     char.position.set(-.45,.18,-.2);char.rotation.set(0,0,0);char.scale.setScalar(.85);
@@ -1911,20 +1986,61 @@ function handleEnterExit(dtF){
       const fx=Math.sin(player.heading),fz=Math.cos(player.heading);
       const veh=vehicle;
       player.x=veh.position.x-fz*2.6;player.z=veh.position.z+fx*2.6;
-      player.vx=player.vz=0;player.vy=0;player.y=0;player.climbV=0;player.airborne=false;
+      player.vx=player.vz=0;player.vy=0;player.climbV=0;player.airborne=false;player._rx=undefined;
+      // stand on whatever is actually under us (deck/ramp/ground) — forcing y=0 dropped you under raised roads
+      player.y=footSupport(player.x,player.z,veh.position.y||0).h;
       if(!parked.includes(veh))parked.push(veh);
       dismountChar();openDoor(veh,perf+.8);vehicle=null;
     }
   }else{
     const near=nearestEnterable();
     if(near){
-      const what=near.userData.type==='bike'?'bike':near.userData.type==='auto'?'auto':'car';
+      const t0=near.userData.type;const what=t0==='bike'?'bike':t0==='auto'?'auto':t0==='plane'?'plane':'car';
       prompt.innerHTML='Press <b>E</b> to '+(parked.includes(near)?'ride this '+what:'<b>steal</b> this '+what);
       prompt.style.opacity=1;
     }else prompt.style.opacity=0;
     if(pressedE&&exitCool<=0&&near){exitCool=.6;startJack(near);}
   }
   pressedE=false;
+}
+// arcade flight model: W/S throttle, A/D rudder+bank, Space climb, Shift dive. Needs takeoff speed to leave the ground.
+// MOUSE flies the plane: the nose follows where the camera looks (yaw) and the mouse pitch climbs/dives.
+// W/S = throttle, A/D = roll + rudder assist. Needs takeoff airspeed before it leaves the ground.
+function planeUpdate(k,dt,dtF){
+  const v=vehicle,ud=v.userData;
+  ud.thr=M.clamp((ud.thr||0)+((k.up?1:0)-(k.dn?1:0))*.7*dt,0,1);
+  ud.spd=M.lerp(ud.spd||0,ud.thr*2.4,.012*dtF);            // airspeed eases toward the throttle setting
+  const onGround=player.y<=.06,canFly=ud.spd>1.0;
+  // --- steer with the mouse: turn the nose toward the camera's look direction (yaw) ---
+  const worldAim=player.heading+camYaw;
+  let dh=worldAim-player.heading;while(dh>Math.PI)dh-=2*Math.PI;while(dh<-Math.PI)dh+=2*Math.PI;
+  const aRud=(k.lf?1:0)-(k.rt?1:0);                        // A/D add rudder/roll on top of the mouse
+  player.heading+=(dh*.9+aRud*.5)*(onGround?.04:.05)*Math.min(1,ud.spd/.4)*dtF;
+  camYaw=worldAim-player.heading;                          // camera holds its world direction; the plane turns under it
+  const pitchCmd=canFly?M.clamp(-camPitch,-.5,.55):0;      // mouse up (camPitch<0) = climb
+  // --- vertical flight ---
+  if(canFly){
+    player.vy+=pitchCmd*5.0*dt;                            // elevator from the mouse
+    player.vy+=(ud.spd-1.0)*1.6*dt;                        // lift from airspeed
+    player.vy-=9.0*dt*(1-Math.min(1,ud.spd/1.6));          // gravity, eased by airspeed
+  }else player.vy-=14*dt;                                  // too slow: sink/stall
+  player.vy=M.clamp(player.vy,-13,11)*Math.pow(.99,dtF);
+  player.y+=player.vy*dt;
+  if(player.y<=0){if(player.vy<-6){damageVehicle(-player.vy*1.6);crashSound(.6);}player.y=0;player.vy=0;}
+  player.y=M.clamp(player.y,0,160);
+  // --- horizontal motion along the heading ---
+  const nfx=Math.sin(player.heading),nfz=Math.cos(player.heading);
+  player.vx=nfx*ud.spd;player.vz=nfz*ud.spd;
+  let nx=v.position.x+player.vx*dtF,nz=v.position.z+player.vz*dtF;
+  if(player.y<22){const pp={x:nx,z:nz,vx:player.vx,vz:player.vz};const imp=resolveCircle(pp,ud.rad);
+    nx=pp.x;nz=pp.z;if(imp>.4){ud.spd*=.6;damageVehicle(imp*22);crashSound(imp);}}
+  nx=M.clamp(nx,-WORLD+6,WORLD-6);nz=M.clamp(nz,-WORLD+6,WORLD-6);
+  v.position.set(nx,player.y,nz);player.x=nx;player.z=nz;
+  // --- visuals: bank into the turn, pitch with the climb rate ---
+  ud.roll=M.lerp(ud.roll||0,onGround?0:M.clamp(-(dh*1.2+aRud*.5),-.7,.7),.08*dtF);
+  ud.pitch=M.lerp(ud.pitch||0,M.clamp(-player.vy*.05,-.5,.5),.1*dtF);
+  v.rotation.set(ud.pitch,player.heading,ud.roll);
+  if(ud.prop)ud.prop.rotation.z+=(.3+ud.thr*2.6)*dtF;
 }
 
 // ---------- minimap ----------
@@ -1933,6 +2049,22 @@ const ms=720/(WORLD*2);
 function drawBlip(x,z,color,r){
   mm.fillStyle=color;mm.beginPath();
   mm.arc((x+WORLD)*ms,(z+WORLD)*ms,r/1.15,0,7);mm.fill();
+}
+// labelled map symbols (used by both the minimap and the full map)
+const LM_COL={hospital:'#e74c3c',police:'#2e6fff',food:'#e67e22',airport:'#16a596'};
+function drawMapIcon(g,x,y,r,type){
+  g.fillStyle=LM_COL[type]||'#888';g.strokeStyle='rgba(0,0,0,.75)';g.lineWidth=r*.2;
+  g.beginPath();g.arc(x,y,r,0,7);g.fill();g.stroke();
+  g.strokeStyle='#fff';g.fillStyle='#fff';g.lineCap='round';g.lineJoin='round';g.lineWidth=Math.max(1.3,r*.24);
+  if(type==='hospital'){const a=r*.5;g.beginPath();g.moveTo(x-a,y);g.lineTo(x+a,y);g.moveTo(x,y-a);g.lineTo(x,y+a);g.stroke();}
+  else if(type==='police'){g.beginPath();for(let i=0;i<10;i++){const ang=-Math.PI/2+i*Math.PI/5,rad=i%2?r*.28:r*.58;i?g.lineTo(x+Math.cos(ang)*rad,y+Math.sin(ang)*rad):g.moveTo(x+Math.cos(ang)*rad,y+Math.sin(ang)*rad);}g.closePath();g.fill();}
+  else if(type==='food'){const a=r*.55;g.beginPath();
+    g.moveTo(x-r*.28,y-a);g.lineTo(x-r*.28,y+a);g.moveTo(x-r*.5,y-a);g.lineTo(x-r*.5,y-a*.1);g.moveTo(x-r*.06,y-a);g.lineTo(x-r*.06,y-a*.1);
+    g.moveTo(x+r*.34,y-a);g.lineTo(x+r*.34,y+a);g.stroke();}
+  else if(type==='airport'){g.beginPath();
+    g.moveTo(x,y-r*.6);g.lineTo(x,y+r*.55);
+    g.moveTo(x,y-r*.05);g.lineTo(x-r*.6,y+r*.22);g.moveTo(x,y-r*.05);g.lineTo(x+r*.6,y+r*.22);
+    g.moveTo(x,y+r*.4);g.lineTo(x-r*.26,y+r*.6);g.moveTo(x,y+r*.4);g.lineTo(x+r*.26,y+r*.6);g.stroke();}
 }
 let healCool=0,insideLM=null;
 function checkLandmarks(dt){
@@ -1969,7 +2101,10 @@ function drawMinimap(){
   for(const a of aiCars)if(a.police)drawBlip(a.mesh.position.x,a.mesh.position.z,'#2e6fff',4.2);
   for(const cw of copWalkers)drawBlip(cw.x,cw.z,'#2e6fff',3);
   for(const g of pickups)drawBlip(g.position.x,g.position.z,'#2ecc71',3.6);
-  for(const Lm of landmarks){mm.fillStyle=Lm.color;mm.fillRect((Lm.x+WORLD)*ms-3.2,(Lm.z+WORLD)*ms-3.2,6.4,6.4);}
+  const upr=Math.PI-player.heading;   // counter the map's rotation so the symbols stay upright
+  const lmMM=(wx,wz,type)=>{mm.save();mm.translate((wx+WORLD)*ms,(wz+WORLD)*ms);mm.rotate(upr);drawMapIcon(mm,0,0,7,type);mm.restore();};
+  for(const Lm of landmarks)lmMM(Lm.x,Lm.z,Lm.type);
+  if(airport)lmMM(airport.cx,airport.cz,'airport');
   if(!player.inCar)for(const p of parked)drawBlip(p.position.x,p.position.z,'#3fa9f5',4);
   mm.restore();
   mm.fillStyle='#fff';mm.strokeStyle='#000';mm.lineWidth=2;
@@ -1993,6 +2128,13 @@ function toggleMap(){
       g.fillStyle='#39d98a';g.beginPath();g.arc((taxiMarker.position.x+WORLD)*k,(taxiMarker.position.z+WORLD)*k,8,0,7);g.fill();}
     g.fillStyle='#2ecc71';
     for(const p of pickups){g.beginPath();g.arc((p.position.x+WORLD)*k,(p.position.z+WORLD)*k,4,0,7);g.fill();}
+    // labelled landmark + airport symbols (north-up, so text is readable)
+    const lmR=Math.max(9,sz*.015);g.textAlign='center';g.textBaseline='middle';g.font='bold '+Math.round(lmR*1.05)+'px Arial';
+    const lmBig=(wx,wz,type,label)=>{const sx=(wx+WORLD)*k,sy=(wz+WORLD)*k;drawMapIcon(g,sx,sy,lmR,type);
+      g.lineWidth=3;g.strokeStyle='#000';g.fillStyle='#fff';g.strokeText(label,sx,sy+lmR*2);g.fillText(label,sx,sy+lmR*2);};
+    for(const Lm of landmarks)lmBig(Lm.x,Lm.z,Lm.type,Lm.name);
+    if(airport)lmBig(airport.cx,airport.cz,'airport','AIRPORT');
+    g.textBaseline='alphabetic';
     g.fillStyle='#fff';g.strokeStyle='#000';g.lineWidth=2;
     g.save();g.translate((player.x+WORLD)*k,(player.z+WORLD)*k);g.rotate(Math.PI-player.heading);
     g.beginPath();g.moveTo(0,-9);g.lineTo(6,7);g.lineTo(0,3);g.lineTo(-6,7);g.closePath();g.fill();g.stroke();g.restore();
@@ -2001,6 +2143,7 @@ function toggleMap(){
 
 // ---------- zones ----------
 function zoneName(){
+  if(airport&&player.x>airport.x0&&player.x<airport.x1&&player.z>airport.z0&&player.z<airport.z1)return 'Indira Gandhi Airport';
   if(river&&Math.abs(player.x-river.cx)<river.half+9)return 'Yamuna Riverfront';
   for(const Lm of landmarks)if(Math.abs(player.x-Lm.x)<Lm.hw&&Math.abs(player.z-Lm.z)<Lm.hd)return Lm.name;
   for(const b of blocks)if(b.park&&player.x>b.x0-12&&player.x<b.x1+12&&player.z>b.z0-12&&player.z<b.z1+12)return 'Nehru Park';
@@ -2026,7 +2169,9 @@ function animate(){
 
   // --- player ---
   if(!dead){
-    if(player.inCar&&vehicle){
+    if(player.inCar&&vehicle&&vehicle.userData.type==='plane'){
+      planeUpdate(k,dt,dtF);
+    }else if(player.inCar&&vehicle){
       const bike=vehicle.userData.type==='bike';
       const fx=Math.sin(player.heading),fz=Math.cos(player.heading);
       let vf=player.vx*fx+player.vz*fz, vl=player.vx*fz-player.vz*fx;
@@ -2345,6 +2490,11 @@ function animate(){
   sun.position.set(player.x+Math.cos((tod-.25)*Math.PI*2)*220,Math.max(el,.1)*260,player.z+120);
   sun.target.position.set(player.x,0,player.z);
 
+  // NaN sentinel: one bad physics frame must never permanently poison the camera (the blue-screen lock bug).
+  // M.clamp/lerp propagate NaN forever, so snap back to the last finite player position instead.
+  if(isFinite(player.x)&&isFinite(player.y)&&isFinite(player.z)){player._gx=player.x;player._gy=player.y;player._gz=player.z;}
+  else{player.x=player._gx||0;player.y=player._gy||0;player.z=player._gz||0;player.vx=player.vz=player.vy=0;player.airborne=false;}
+
   // --- camera (mouse-orbit, GTA-style) ---
   const spd=Math.hypot(player.vx,player.vz);
   // slowly swing back behind the player when driving and the mouse is idle
@@ -2358,9 +2508,12 @@ function animate(){
   let dist,baseH,ly;
   if(player.inCar&&vehicle){dist=10+spd*4;baseH=3.4;ly=2;}
   else{dist=6.5;baseH=2.6;ly=1.6;}
+  if(player.inCar&&vehicle&&vehicle.userData.type==='plane'){dist=18+spd*3;baseH=6;ly=2;}
   if(insideLM&&!player.inCar){dist=4.2;baseH=4.6;ly=1.4;}   // tuck the camera in under the open roof
   const py=player.y;
   const cx=player.x-cfx*dist*ch, cz=player.z-cfz*dist*ch, cy=baseH+py+dist*cv+(player.inCar?spd*1.4:0);
+  // self-heal: if the camera ever went non-finite, lerp can never recover it — snap straight to target
+  if(!isFinite(camera.position.x)||!isFinite(camera.position.y)||!isFinite(camera.position.z))camera.position.set(cx,cy,cz);
   camera.position.x=M.lerp(camera.position.x,cx,.12*dtF);
   camera.position.y=M.lerp(camera.position.y,cy,.12*dtF);
   camera.position.z=M.lerp(camera.position.z,cz,.12*dtF);
@@ -2368,6 +2521,10 @@ function animate(){
     camera.position.y+=(Math.random()-.5)*spd*.05;
     camera.position.x+=(Math.random()-.5)*spd*.04;
   }
+  // never let the camera dip below the surface beneath it: the ground is a single-sided plane, so going under it
+  // shows nothing but the blue sky background — this was the "screen turns blue, camera stuck on sky" bug after exiting.
+  const camFloor=groundHeightAt(camera.position.x,camera.position.z)+0.4;
+  if(camera.position.y<camFloor)camera.position.y=camFloor;
   camera.lookAt(player.x+cfx*2,ly+py,player.z+cfz*2);
   const tFov=70+(player.inCar?spd*8:0);
   if(Math.abs(camera.fov-tFov)>.3){camera.fov=M.lerp(camera.fov,tFov,.08);camera.updateProjectionMatrix();}
