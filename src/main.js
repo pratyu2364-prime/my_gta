@@ -92,8 +92,11 @@ window.__probe=()=>{const st={parked:parked.length,ai:aiCars.length};
     st.parkedTaxi=parked.filter(v=>v.userData&&v.userData.taxi).length;st.money=money;
     const plane=parked.find(v=>v.userData.type==='plane');st.planes=parked.filter(v=>v.userData.type==='plane').length;
     if(plane){const pb=new THREE.Box3().setFromObject(plane);st.planeMinY=+pb.min.y.toFixed(3);st.planeY=+plane.position.y.toFixed(2);}
+    const heli=parked.find(v=>v.userData.type==='heli');if(heli){st.heliX=+heli.position.x.toFixed(0);st.heliZ=+heli.position.z.toFixed(0);}
     st.airportCx=airport?+airport.cx.toFixed(0):null;st.airportCz=airport?+airport.cz.toFixed(0):null;
     st.inCar=player.inCar;st.vehType=vehicle?vehicle.userData.type:null;st.inPlane=player.inCar&&vehicle&&vehicle.userData.type==='plane';
+    st.px=+player.x.toFixed(2);st.pz=+player.z.toFixed(2);st.vehHp=vehicle?+vehicle.userData.hp.toFixed(1):null;
+    st.vehSpd=vehicle&&vehicle.userData.spd!=null?+vehicle.userData.spd.toFixed(2):null;st.vy=+player.vy.toFixed(2);
     const _wd=new THREE.Vector3();camera.getWorldDirection(_wd);st.camY=+camera.position.y.toFixed(2);st.camDirY=+_wd.y.toFixed(3);st.camPitch=+camPitch.toFixed(3);}catch(e){st.probeErr=e.message;}
   return st;}; // TEMP
 window.__tp=(x,z)=>{player.x=x;player.z=z;if(!player.inCar){player.y=0;player.vy=0;}}; // TEMP test teleport
@@ -836,6 +839,31 @@ function makePlane(color){   // light propeller plane (flyable) — nose at +z =
   g.userData={wheels,hp:90,type:'plane',rad:3.2,prop,thr:0,roll:0,pitch:0};
   scene.add(g);return g;
 }
+function makeHeli(color){   // light helicopter — nose at +z = our forward; Arrows climb/descend, WASD move
+  const g=new THREE.Group();
+  const body=new THREE.MeshStandardMaterial({color,roughness:.4,metalness:.5,envMapIntensity:1}),
+        dark=new THREE.MeshStandardMaterial({color:0x222831,roughness:.5,metalness:.55}),
+        glass=new THREE.MeshStandardMaterial({color:0x0e151d,roughness:.05,metalness:.95,transparent:true,opacity:.55});
+  const cab=new THREE.Mesh(new THREE.SphereGeometry(1.35,16,12),body);cab.scale.set(1,.95,1.25);cab.position.y=1.7;cab.castShadow=true;g.add(cab);
+  const nose=new THREE.Mesh(new THREE.SphereGeometry(1.0,14,10),glass);nose.scale.set(1,.85,1.1);nose.position.set(0,1.75,1.05);g.add(nose);
+  const boom=new THREE.Mesh(new THREE.CylinderGeometry(.26,.13,4.4,10),body);boom.rotation.x=Math.PI/2;boom.position.set(0,2.05,-3.0);boom.castShadow=true;g.add(boom);
+  const fin=new THREE.Mesh(new THREE.BoxGeometry(.12,1.0,.7),body);fin.position.set(0,2.5,-4.9);g.add(fin);
+  // main rotor (spins about Y)
+  const rotor=new THREE.Group();const hub=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,.3,8),dark);rotor.add(hub);
+  for(let i=0;i<2;i++){const bl=new THREE.Mesh(new THREE.BoxGeometry(7.4,.06,.34),dark);bl.rotation.y=i*Math.PI/2;rotor.add(bl);}
+  rotor.position.set(0,3.05,0);g.add(rotor);
+  const mast=new THREE.Mesh(new THREE.CylinderGeometry(.1,.1,1.0,8),dark);mast.position.set(0,2.6,0);g.add(mast);
+  // tail rotor (spins about X)
+  const trotor=new THREE.Group();
+  for(let i=0;i<2;i++){const bl=new THREE.Mesh(new THREE.BoxGeometry(.06,1.5,.18),dark);bl.rotation.x=i*Math.PI/2;trotor.add(bl);}
+  trotor.position.set(.3,2.55,-5.1);g.add(trotor);
+  // skids
+  const skidMat=new THREE.MeshStandardMaterial({color:0x14171b,roughness:.7,metalness:.4});
+  for(const sx of[-1.1,1.1]){const rail=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,3.4,8),skidMat);rail.rotation.x=Math.PI/2;rail.position.set(sx,.18,.1);g.add(rail);
+    for(const sz of[-.9,1.1]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.1,.9,.1),skidMat);leg.position.set(sx,.65,sz);g.add(leg);}}
+  g.userData={wheels:[],hp:140,type:'heli',rad:3.0,rotor,trotor,spin:0,spd:0,roll:0,pitch:0};
+  scene.add(g);return g;
+}
 function makeRickshaw(){   // Bharat auto-rickshaw (3-wheeler)
   const g=new THREE.Group();
   const yellow=new THREE.MeshStandardMaterial({color:0xf4c20d,roughness:.4,metalness:.45,envMapIntensity:.9}),green=new THREE.MeshStandardMaterial({color:0x1e7a3a,roughness:.45,metalness:.4,envMapIntensity:.8}),blk=new THREE.MeshStandardMaterial({color:0x15181c,roughness:.5,metalness:.3});
@@ -1235,6 +1263,8 @@ function boot(){
   // parked planes lined up on the runway (face +x, down the runway)
   for(let i=0;i<2;i++){const pl=makePlane(pick([0xecf0f1,0xc0392b]));
     pl.position.set(airport.cx-45+i*55,0,airport.cz);pl.rotation.y=Math.PI/2;parked.push(pl);}
+  // a helicopter parked beside the runway
+  {const hl=makeHeli(0x1f6fae);hl.position.set(airport.cx+5,0,airport.cz-34);hl.rotation.y=Math.PI;parked.push(hl);}
   for(let i=0;i<42;i++)spawnAI(false);
   for(let i=0;i<11;i++)spawnAI(true);
   for(let i=0;i<4;i++)spawnPatrol();                 // ambient patrol cruisers in traffic
@@ -1838,6 +1868,7 @@ function showMsg(t){
 // ---------- death / arrest ----------
 function damageVehicle(n){
   if(!vehicle||vehicle.userData.dead)return;
+  n*=0.4;                                       // health depletes slowly — softer damage across the board
   vehicle.userData.hp-=n;hitFlash(Math.min(.7,n/40));
   if(vehicle.userData.hp<=0){
     vehicle.userData.dead=true;vehicle.userData.hp=0;
@@ -1887,7 +1918,13 @@ function mountChar(v){
     char.position.set(0,1.2,.9);char.rotation.set(0,0,0);char.scale.setScalar(.8);
     pose(char,true);char.visible=true;
     v.userData.thr=0;v.userData.spd=0;camPitch=0;camYaw=0;            // neutral, level start
-    showMsg('✈ Mouse = steer · W = throttle · S = brake · A/D = roll');
+    showMsg('✈ Mouse = steer · mouse up/down = climb/dive · W = throttle · S = brake · A/D = roll');
+  }else if(v.userData.type==='heli'){ // seated in the cockpit
+    v.add(char);
+    char.position.set(0,1.55,.4);char.rotation.set(0,0,0);char.scale.setScalar(.8);
+    pose(char,true);char.visible=true;
+    v.userData.spin=0;v.userData.spd=0;camYaw=0;
+    showMsg('🚁 Arrows = up/down · W/S = forward/back · A/D = turn');
   }else{ // visible through the glass cabin
     v.add(char);
     char.position.set(-.45,.18,-.2);char.rotation.set(0,0,0);char.scale.setScalar(.85);
@@ -1995,7 +2032,7 @@ function handleEnterExit(dtF){
   }else{
     const near=nearestEnterable();
     if(near){
-      const t0=near.userData.type;const what=t0==='bike'?'bike':t0==='auto'?'auto':t0==='plane'?'plane':'car';
+      const t0=near.userData.type;const what=t0==='bike'?'bike':t0==='auto'?'auto':t0==='plane'?'plane':t0==='heli'?'helicopter':'car';
       prompt.innerHTML='Press <b>E</b> to '+(parked.includes(near)?'ride this '+what:'<b>steal</b> this '+what);
       prompt.style.opacity=1;
     }else prompt.style.opacity=0;
@@ -2017,14 +2054,12 @@ function planeUpdate(k,dt,dtF){
   const aRud=(k.lf?1:0)-(k.rt?1:0);                        // A/D add rudder/roll on top of the mouse
   player.heading+=(dh*.9+aRud*.5)*(onGround?.04:.05)*Math.min(1,ud.spd/.4)*dtF;
   camYaw=worldAim-player.heading;                          // camera holds its world direction; the plane turns under it
-  const pitchCmd=canFly?M.clamp(-camPitch,-.5,.55):0;      // mouse up (camPitch<0) = climb
-  // --- vertical flight ---
+  const pitchCmd=canFly?M.clamp(-camPitch,-1.0,1.0):0;     // mouse up (camPitch<0) = climb, down = dive
+  // --- vertical flight: elevation tracks the MOUSE up/down directly (steep, not speed-bound) ---
   if(canFly){
-    player.vy+=pitchCmd*5.0*dt;                            // elevator from the mouse
-    player.vy+=(ud.spd-1.0)*1.6*dt;                        // lift from airspeed
-    player.vy-=9.0*dt*(1-Math.min(1,ud.spd/1.6));          // gravity, eased by airspeed
+    player.vy=M.lerp(player.vy,pitchCmd*20,.07*dtF);       // climb/dive rate follows the mouse pitch
   }else player.vy-=14*dt;                                  // too slow: sink/stall
-  player.vy=M.clamp(player.vy,-13,11)*Math.pow(.99,dtF);
+  player.vy=M.clamp(player.vy,-22,18);
   player.y+=player.vy*dt;
   if(player.y<=0){if(player.vy<-6){damageVehicle(-player.vy*1.6);crashSound(.6);}player.y=0;player.vy=0;}
   player.y=M.clamp(player.y,0,160);
@@ -2041,6 +2076,42 @@ function planeUpdate(k,dt,dtF){
   ud.pitch=M.lerp(ud.pitch||0,M.clamp(-player.vy*.05,-.5,.5),.1*dtF);
   v.rotation.set(ud.pitch,player.heading,ud.roll);
   if(ud.prop)ud.prop.rotation.z+=(.3+ud.thr*2.6)*dtF;
+}
+
+// helicopter flight model: ARROW Up/Down = climb/descend, W/S = forward/back, A/D = yaw (turn). Mouse also yaws.
+function heliUpdate(k,dt,dtF){
+  const v=vehicle,ud=v.userData;
+  ud.spin=M.clamp((ud.spin||0)+dt*0.5,0,1);               // rotor spins up to full power
+  const lift=ud.spin;
+  // --- vertical: arrow keys command climb/descend, scaled by rotor power ---
+  const climb=(keys.ArrowUp?1:0)-(keys.ArrowDown?1:0);
+  player.vy=M.lerp(player.vy,(climb*11 - (lift<.98?2.2:0))*lift,.09*dtF);
+  player.vy=M.clamp(player.vy,-13,13);
+  player.y+=player.vy*dt;
+  if(player.y<=0){if(player.vy<-6){damageVehicle(-player.vy*1.4);crashSound(.5);}player.y=0;player.vy=0;}
+  player.y=M.clamp(player.y,0,180);
+  // --- yaw: A/D rudder + the mouse look direction ---
+  const worldAim=player.heading+camYaw;
+  let dh=worldAim-player.heading;while(dh>Math.PI)dh-=2*Math.PI;while(dh<-Math.PI)dh+=2*Math.PI;
+  const yawIn=(keys.KeyA?1:0)-(keys.KeyD?1:0);
+  player.heading+=(dh*.06+yawIn*.035)*dtF;
+  camYaw=worldAim-player.heading;
+  // --- horizontal: W/S thrust along the heading ---
+  const fwd=(keys.KeyW?1:0)-(keys.KeyS?1:0);
+  ud.spd=M.lerp(ud.spd||0,fwd*1.7*lift,.04*dtF);
+  const nfx=Math.sin(player.heading),nfz=Math.cos(player.heading);
+  player.vx=nfx*ud.spd;player.vz=nfz*ud.spd;
+  let nx=v.position.x+player.vx*dtF,nz=v.position.z+player.vz*dtF;
+  if(player.y<22){const pp={x:nx,z:nz,vx:player.vx,vz:player.vz};const imp=resolveCircle(pp,ud.rad);
+    nx=pp.x;nz=pp.z;if(imp>.4){ud.spd*=.5;damageVehicle(imp*16);crashSound(imp);}}
+  nx=M.clamp(nx,-WORLD+6,WORLD-6);nz=M.clamp(nz,-WORLD+6,WORLD-6);
+  v.position.set(nx,player.y,nz);player.x=nx;player.z=nz;
+  // --- visuals: nose-down when moving forward, bank into the yaw, spin the rotors ---
+  ud.roll=M.lerp(ud.roll||0,M.clamp(yawIn*.22,-.4,.4),.08*dtF);
+  ud.pitch=M.lerp(ud.pitch||0,M.clamp(ud.spd*.22,-.35,.35),.1*dtF);
+  v.rotation.set(ud.pitch,player.heading,ud.roll);
+  if(ud.rotor)ud.rotor.rotation.y+=(.4+lift*3.4)*dtF;
+  if(ud.trotor)ud.trotor.rotation.x+=(.5+lift*4)*dtF;
 }
 
 // ---------- minimap ----------
@@ -2171,6 +2242,8 @@ function animate(){
   if(!dead){
     if(player.inCar&&vehicle&&vehicle.userData.type==='plane'){
       planeUpdate(k,dt,dtF);
+    }else if(player.inCar&&vehicle&&vehicle.userData.type==='heli'){
+      heliUpdate(k,dt,dtF);
     }else if(player.inCar&&vehicle){
       const bike=vehicle.userData.type==='bike';
       const fx=Math.sin(player.heading),fz=Math.cos(player.heading);
@@ -2509,6 +2582,7 @@ function animate(){
   if(player.inCar&&vehicle){dist=10+spd*4;baseH=3.4;ly=2;}
   else{dist=6.5;baseH=2.6;ly=1.6;}
   if(player.inCar&&vehicle&&vehicle.userData.type==='plane'){dist=18+spd*3;baseH=6;ly=2;}
+  if(player.inCar&&vehicle&&vehicle.userData.type==='heli'){dist=15+spd*3;baseH=5.5;ly=2.4;}
   if(insideLM&&!player.inCar){dist=4.2;baseH=4.6;ly=1.4;}   // tuck the camera in under the open roof
   const py=player.y;
   const cx=player.x-cfx*dist*ch, cz=player.z-cfz*dist*ch, cy=baseH+py+dist*cv+(player.inCar?spd*1.4:0);
