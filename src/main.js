@@ -97,6 +97,7 @@ window.__probe=()=>{const st={parked:parked.length,ai:aiCars.length};
     if(plane){const pb=new THREE.Box3().setFromObject(plane);st.planeMinY=+pb.min.y.toFixed(3);st.planeY=+plane.position.y.toFixed(2);}
     const heli=parked.find(v=>v.userData.type==='heli');if(heli){st.heliX=+heli.position.x.toFixed(0);st.heliZ=+heli.position.z.toFixed(0);}
     st.airportCx=airport?+airport.cx.toFixed(0):null;st.airportCz=airport?+airport.cz.toFixed(0):null;
+    st.raceCx=race?+race.cx.toFixed(0):null;st.raceCz=race?+race.cz.toFixed(0):null;st.raceWp=race&&race.wp?race.wp.length:0;
     st.inCar=player.inCar;st.vehType=vehicle?vehicle.userData.type:null;st.inPlane=player.inCar&&vehicle&&vehicle.userData.type==='plane';
     st.px=+player.x.toFixed(2);st.pz=+player.z.toFixed(2);st.vehHp=vehicle?+vehicle.userData.hp.toFixed(1):null;
     st.vehSpd=vehicle&&vehicle.userData.spd!=null?+vehicle.userData.spd.toFixed(2):null;st.vy=+player.vy.toFixed(2);
@@ -421,6 +422,32 @@ const airport={};
   const cab=new THREE.Mesh(new THREE.BoxGeometry(9,4,9),new THREE.MeshStandardMaterial({color:0x1a2230,roughness:.1,metalness:.6,transparent:true,opacity:.7}));
   cab.position.set(tx2,21,tz);scene.add(cab);
   const bcn=new THREE.PointLight(0xff4444,1.0,70);bcn.position.set(tx2,24,tz);scene.add(bcn);airport.beacon=bcn;
+}
+
+// ---------- F1-style race circuit (data + visuals + marker; race logic added separately) ----------
+const race={cx:(spawnX>0?1:-1)*(WORLD-150),cz:(spawnZ>0?1:-1)*(WORLD-150),rx:72,rz:56,active:false,marker:null};
+race.x0=race.cx-92;race.x1=race.cx+92;race.z0=race.cz-78;race.z1=race.cz+78;
+// reserve the circuit footprint so no buildings spawn on the track (same trick as the airport)
+for(const b of blocks)if(!b.special&&!b.river&&b.x1>race.x0-6&&b.x0<race.x1+6&&b.z1>race.z0-6&&b.z0<race.z1+6){b.special=true;b.race=true;}
+race.wp=[];for(let i=0;i<16;i++){const a=i/16*Math.PI*2;race.wp.push({x:race.cx+Math.cos(a)*race.rx,z:race.cz+Math.sin(a)*race.rz});}
+{
+  // grass infield
+  const inf=new THREE.Mesh(new THREE.CircleGeometry(1,48),new THREE.MeshStandardMaterial({color:0x2f7d34,roughness:1}));
+  inf.rotation.x=-Math.PI/2;inf.scale.set(race.rx-9,race.rz-9,1);inf.position.set(race.cx,.05,race.cz);inf.receiveShadow=true;scene.add(inf);
+  // asphalt ribbon: one slab per segment of the loop
+  const trackMat=new THREE.MeshStandardMaterial({color:0x23262b,roughness:.92,metalness:.05});
+  for(let i=0;i<race.wp.length;i++){const a=race.wp[i],b2=race.wp[(i+1)%race.wp.length];
+    const dx=b2.x-a.x,dz=b2.z-a.z,len=Math.hypot(dx,dz);
+    const seg=new THREE.Mesh(new THREE.BoxGeometry(len+2.5,.12,14),trackMat);
+    seg.position.set((a.x+b2.x)/2,.12,(a.z+b2.z)/2);seg.rotation.y=Math.atan2(-dz,dx);seg.receiveShadow=true;scene.add(seg);}
+  // start/finish stripe at wp[0]
+  const d0x=race.wp[1].x-race.wp[0].x,d0z=race.wp[1].z-race.wp[0].z;
+  const sf=new THREE.Mesh(new THREE.BoxGeometry(2.2,.14,14),new THREE.MeshStandardMaterial({color:0xf2f2f2,roughness:.6}));
+  sf.position.set(race.wp[0].x,.16,race.wp[0].z);sf.rotation.y=Math.atan2(-d0z,d0x);scene.add(sf);
+  // drive-in start marker (red ring) — race logic hooks onto this next
+  const rm=new THREE.Group();
+  const rr=new THREE.Mesh(new THREE.TorusGeometry(2.4,.32,8,26),new THREE.MeshBasicMaterial({color:0xff2d2d}));rr.rotation.x=Math.PI/2;rr.position.y=.6;
+  rm.add(rr);rm.position.set(race.wp[0].x,0,race.wp[0].z);scene.add(rm);race.marker=rm;
 }
 
 for(const b of blocks){
@@ -2264,6 +2291,7 @@ function drawMinimap(){
       for(let i=1;i<taxi.route.length;i++)mm.lineTo((taxi.route[i][0]+WORLD)*ms,(taxi.route[i][1]+WORLD)*ms);mm.stroke();}
     drawBlip(taxiMarker.position.x,taxiMarker.position.z,'#39d98a',6);
   }
+  drawBlip(race.cx,race.cz,'#ffffff',7);drawBlip(race.cx,race.cz,'#111111',3);   // checkered race-circuit marker
   for(const c of cops)drawBlip(c.mesh.position.x,c.mesh.position.z,'#ff3b30',5);
   for(const f of footCops)drawBlip(f.mesh.position.x,f.mesh.position.z,'#ff3b30',3.4);
   for(const g of gangs)if(g.state!=='dead')drawBlip(g.x,g.z,g.state==='aggro'?'#ff6a00':'#b8439b',3.6);
@@ -2654,6 +2682,7 @@ function animate(){
   // --- taxi career ---
   if(!dead)taxiUpdate(dt,dtF);
   if(taxiMarker.visible){taxiMarker.rotation.y+=dt;taxiMarker.children[0].position.y=.6+Math.sin(perf*3)*.25;}
+  if(race.marker&&!race.active){race.marker.rotation.y+=dt*1.5;race.marker.children[0].position.y=.6+Math.sin(perf*3)*.3;}
 
   // --- day/night (smooth) ---
   const el=Math.sin((tod-.25)*Math.PI*2);
