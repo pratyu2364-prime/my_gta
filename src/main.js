@@ -1163,7 +1163,7 @@ const TALK=['Namaste! Kaise ho?','Arre, dekh ke chalo, bhai!','Try the chaat at 
   'Kya scene hai? Nice weather for a stroll.','Mind your own work, ji.','Auto! Auto! ...oh, not for me.',
   'Jai Hind! \u{1F1EE}\u{1F1F3}','Chai pi lo, fir baat karte hain.','Yeh sheher kabhi sota nahi.'];
 function findNearestPed(r){let best=null,bd=r;for(const p of peds){if(p.state==='down'||p.state==='talk')continue;
-  const d=Math.hypot(p.x-player.x,p.z-player.z);if(d<bd){bd=d;best=p;}}return best;}
+  const d=pdist(p.x,p.z);if(d<bd){bd=d;best=p;}}return best;}
 addEventListener('keydown',e=>{
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
   keys[e.code]=true;start();
@@ -1198,6 +1198,7 @@ const inp=()=>({
 let money=500,wanted=0,crimeCool=0,wantedTimer=0,playerHp=100;
 let tod=.32;
 const player={x:spawnX+5,z:spawnZ-4,vx:0,vz:0,vy:0,y:0,climbV:0,heading:Math.PI/2,inCar:false,steer:0,airborne:false,meleeAnim:0,jumpHeld:false};
+const pdist=(x,z)=>Math.hypot(player.x-x,player.z-z);   // distance from the player to a world point (symmetric)
 const char=buildCharacter(0xe8b88f,0x223a5e,0x222831,0x2b1b0e,false);scene.add(char);char.position.set(player.x,0,player.z);
 let vehicle=null,exitCool=0,dead=false;
 // you start on foot — your yellow car waits at the curb, a bike across the street
@@ -1453,7 +1454,7 @@ function aiUpdate(ai,dtF){
   else{for(let i=L.cross.length-1;i>=0;i--)if(L.cross[i].c<pos-.1){next=L.cross[i].c;nextLine=L.cross[i];break;}}
   // panic: during a pursuit nearby civilian traffic floors it to clear the area (still obeys the brakes below)
   let panic=1;ai.panic=false;
-  if(!ai.police&&wanted>=2){const pd=Math.hypot(m.position.x-player.x,m.position.z-player.z);
+  if(!ai.police&&wanted>=2){const pd=pdist(m.position.x,m.position.z);
     if(pd<48){panic=1.6;ai.panic=true;}}
   let target=ai.jacked?0:ai.base*panic;
   if(next!==null){
@@ -1695,8 +1696,8 @@ function copUpdate(c,dtF){
 }
 function nearestPoliceDist(){
   let m=1e9;
-  for(const c of cops)m=Math.min(m,Math.hypot(c.mesh.position.x-player.x,c.mesh.position.z-player.z));
-  for(const f of footCops)m=Math.min(m,Math.hypot(f.mesh.position.x-player.x,f.mesh.position.z-player.z));
+  for(const c of cops)m=Math.min(m,pdist(c.mesh.position.x,c.mesh.position.z));
+  for(const f of footCops)m=Math.min(m,pdist(f.mesh.position.x,f.mesh.position.z));
   return m;
 }
 function policeNear(r){return nearestPoliceDist()<r;}
@@ -2313,7 +2314,7 @@ function zoneName(){
   if(river&&Math.abs(player.x-river.cx)<river.half+9)return 'Yamuna Riverfront';
   for(const Lm of landmarks)if(Math.abs(player.x-Lm.x)<Lm.hw&&Math.abs(player.z-Lm.z)<Lm.hd)return Lm.name;
   for(const b of blocks)if(b.park&&player.x>b.x0-12&&player.x<b.x1+12&&player.z>b.z0-12&&player.z<b.z1+12)return 'Nehru Park';
-  const d=Math.hypot(player.x-spawnX,player.z-spawnZ);
+  const d=pdist(spawnX,spawnZ);
   return d<140?'Connaught Place':d<280?'Bazaar District':'City Outskirts';
 }
 
@@ -2480,7 +2481,7 @@ function animate(){
         if(armed){gm.rotation.x=-tt*1.2;L[3].rotation.set(-1.5-tt*.5,0,-.13);}       // knife stab
         else{gm.visible=false;L[3].rotation.set(-tt*1.95,0,0);L[2].rotation.set(s*.5,0,0);}}  // bare-fist jab
       for(const a of aiCars){
-        if(player.y<1.2&&Math.hypot(a.mesh.position.x-player.x,a.mesh.position.z-player.z)<1.6&&a.cur>.3)wastedNow();
+        if(player.y<1.2&&pdist(a.mesh.position.x,a.mesh.position.z)<1.6&&a.cur>.3)wastedNow();
       }
       // nudge props on foot
       for(const pr of dynProps){if(pr.dead)continue;
@@ -2488,7 +2489,7 @@ function animate(){
         if(d<.55+pr.rad){const hs=Math.hypot(player.vx,player.vz);knockProp(pr,-dx/(d||1),-dz/(d||1),hs*.9+.05);}}
       // gun pickups
       for(const g of pickups){
-        if(Math.hypot(g.position.x-player.x,g.position.z-player.z)<2.2){
+        if(pdist(g.position.x,g.position.z)<2.2){
           giveWeapon(g.userData.kind);
           scene.remove(g);pickups.splice(pickups.indexOf(g),1);
           setTimeout(spawnPickup,30000);
@@ -2515,11 +2516,11 @@ function animate(){
       spawnP(ox+Math.sin(aimAng)*.3,oy,oz+Math.cos(aimAng)*.3,0xfff2a0,.32,.07,0,.02,0);
       // gunfire panics nearby civilians and provokes gangs into a fight
       for(const p of peds){if(p.state==='down')continue;
-        if(Math.hypot(p.x-player.x,p.z-player.z)<24){if(p.state==='talk'&&talkingPed===p)talkingPed=null;
+        if(pdist(p.x,p.z)<24){if(p.state==='talk'&&talkingPed===p)talkingPed=null;
           p.state='flee';p.timer=3.4;if(Math.random()<.04)speak(4,p.x,p.z,'shout');}}
-      for(const g of gangs)if(Math.hypot(g.x-player.x,g.z-player.z)<28)provokeGang(g);
+      for(const g of gangs)if(pdist(g.x,g.z)<28)provokeGang(g);
       // firing on or near police triggers an immediate tactical chase
-      let copSeen=false;const near36=(x,z)=>Math.hypot(x-player.x,z-player.z)<36;
+      let copSeen=false;const near36=(x,z)=>pdist(x,z)<36;
       for(const c of cops)if(near36(c.mesh.position.x,c.mesh.position.z))copSeen=true;
       for(const f of footCops)if(near36(f.mesh.position.x,f.mesh.position.z))copSeen=true;
       for(const cw of copWalkers)if(near36(cw.x,cw.z))copSeen=true;
