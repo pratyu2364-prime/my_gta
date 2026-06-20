@@ -2275,8 +2275,12 @@ function animate(){
       vf=M.clamp(vf,-.4,boost?(bike?1.5:1.35):(bike?1.15:1.0));
       const steerIn=(k.lf?1:0)-(k.rt?1:0);
       player.steer+=(steerIn-player.steer)*.25*dtF;
-      const grip=k.hb?.965:.82;
-      player.heading+=player.steer*(k.hb?.055:(bike?.048:.038))*Math.sign(vf)*Math.min(1,Math.abs(vf)/.5)*dtF;
+      const spd=Math.abs(vf);
+      // speed-sensitive grip: whipping the wheel at speed breaks rear traction → progressive drift.
+      // grip closer to 1 = more lateral velocity retained = more slide.
+      const slide=Math.abs(player.steer)*Math.min(1,spd/.7);
+      const grip=k.hb?.965:M.lerp(.80,.93,slide);
+      player.heading+=player.steer*(k.hb?.055:(bike?.048:.038))*Math.sign(vf)*Math.min(1,spd/.5)*dtF;
       if(k.hb)vf*=Math.pow(.985,dtF);
       vl*=Math.pow(grip,dtF);
       const nfx=Math.sin(player.heading),nfz=Math.cos(player.heading);
@@ -2311,8 +2315,12 @@ function animate(){
       if(bike){
         vehicle.userData.lean.rotation.z=M.lerp(vehicle.userData.lean.rotation.z,-player.steer*Math.min(1,Math.abs(vf))*.45,.15);
       }else{
-        vehicle.children[0].rotation.z=M.lerp(vehicle.children[0].rotation.z,-player.steer*Math.abs(vf)*.12,.2);
-        vehicle.children[0].rotation.x=M.lerp(vehicle.children[0].rotation.x,player.airborne?M.clamp(-player.vy*.018,-.45,.45):(k.up?-.025:k.dn?.03:0),.16);
+        // weight transfer: longitudinal accel pitches the body (squat under power, dive under braking),
+        // lateral load + steer rolls it out of the corner — a sprung-chassis feel instead of key-driven tilt.
+        const longA=vf-(vehicle.userData.pf||0);vehicle.userData.pf=vf;
+        const body=vehicle.children[0];
+        body.rotation.z=M.lerp(body.rotation.z,M.clamp(-player.steer*spd*.14-vl*.7,-.18,.18),.2);
+        body.rotation.x=M.lerp(body.rotation.x,player.airborne?M.clamp(-player.vy*.018,-.45,.45):M.clamp(-longA*1.7,-.12,.15),.16);
       }
       vehicle.userData.wheels.forEach((w,i)=>{w.rotation.x+=vf*.7*dtF;if(!bike&&i<2)w.rotation.y=player.steer*.42;});
       if(boost&&frame%3===0)spawnP(pp.x-nfx*2.6,.5,pp.z-nfz*2.6,0x66bbff,.3,.3,rnd(-.05,.05),.05,rnd(-.05,.05));
