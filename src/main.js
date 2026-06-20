@@ -1438,7 +1438,11 @@ function aiUpdate(ai,dtF){
   let next=null,nextLine=null;
   if(ai.dir>0){for(const W of L.cross)if(W.c>pos+.1){next=W.c;nextLine=W;break;}}
   else{for(let i=L.cross.length-1;i>=0;i--)if(L.cross[i].c<pos-.1){next=L.cross[i].c;nextLine=L.cross[i];break;}}
-  let target=ai.jacked?0:ai.base;
+  // panic: during a pursuit nearby civilian traffic floors it to clear the area (still obeys the brakes below)
+  let panic=1;ai.panic=false;
+  if(!ai.police&&wanted>=2){const pd=Math.hypot(m.position.x-player.x,m.position.z-player.z);
+    if(pd<48){panic=1.6;ai.panic=true;}}
+  let target=ai.jacked?0:ai.base*panic;
   if(next!==null){
     const dist=(next-pos)*ai.dir-HALF-2;
     const st=lightState(ai.axis);
@@ -1463,11 +1467,11 @@ function aiUpdate(ai,dtF){
     const side=ai.axis==='z'?Math.abs(p.x-m.position.x):Math.abs(p.z-m.position.z);
     if(side<2.2)target=Math.min(target,gap<5?0:.12);
   }
-  ai.cur+=M.clamp(target-ai.cur,-.05*dtF,.015*dtF);
+  ai.cur+=M.clamp(target-ai.cur,-.05*dtF,(ai.panic?.03:.015)*dtF);   // panicking drivers accelerate harder
   const newPos=pos+ai.dir*ai.cur*dtF;
   if(ai.axis==='z')m.position.z=newPos;else m.position.x=newPos;
   // turn at intersections (after moving, so newPos applied to the old axis)
-  if(nextLine&&(next-pos)*ai.dir>0&&(next-newPos)*ai.dir<=0&&Math.random()<.45){
+  if(nextLine&&(next-pos)*ai.dir>0&&(next-newPos)*ai.dir<=0&&Math.random()<(ai.panic?.7:.45)){
     ai.line=nextLine;ai.axis=ai.axis==='z'?'x':'z';ai.dir=Math.random()<.5?1:-1;
     if(ai.axis==='x')m.position.z=nextLine.c+laneOff('x',ai.dir);
     else m.position.x=nextLine.c+laneOff('z',ai.dir);
