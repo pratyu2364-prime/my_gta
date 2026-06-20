@@ -120,7 +120,7 @@ Promise.all([
   ...TREEGLBS.map(id=>assets.loadGLTF(id,`./assets/models/nature/${id}.glb`).catch(()=>{}))
 ]).then(runBoot);
 setTimeout(runBoot,10000);     // never hard-block if the CDN/assets are slow or offline
-scene.fog=new THREE.Fog(0x87ceeb,120,900);
+scene.fog=new THREE.Fog(0x87ceeb,100,820);   // pulled in slightly for stronger atmospheric depth (still linear: water shader reads fog.near/far)
 // ---------- post-processing: bloom + cinematic colour grade (degrades gracefully if CDN modules miss) ----------
 let composer=null,bloomPass=null;
 if(EffectComposer&&UnrealBloomPass&&RenderPass&&ShaderPass)try{
@@ -156,8 +156,9 @@ function renderFrame(){composer?composer.render():renderer.render(scene,camera);
 const hemi=new THREE.HemisphereLight(0xbfd6ff,0x4a4034,.6);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff2dd,1.1);
 sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
-sun.shadow.radius=4;sun.shadow.bias=-0.0004;sun.shadow.normalBias=.6;   // soft, artifact-free contact shadows
-const sc=sun.shadow.camera;sc.left=-150;sc.right=150;sc.top=150;sc.bottom=-150;sc.near=20;sc.far=600;
+sun.shadow.radius=3.2;sun.shadow.bias=-0.00035;sun.shadow.normalBias=.5;   // soft, artifact-free contact shadows
+// frustum follows the player (sun tracks player.x/z), so a tighter box packs more texels per unit → crisper shadows for free
+const sc=sun.shadow.camera;sc.left=-110;sc.right=110;sc.top=110;sc.bottom=-110;sc.near=20;sc.far=600;
 scene.add(sun);scene.add(sun.target);
 // night sky stars
 const starGeo=new THREE.BufferGeometry();
