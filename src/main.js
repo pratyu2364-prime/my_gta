@@ -729,6 +729,20 @@ const wheelGeo=new THREE.CylinderGeometry(.45,.45,.42,14);wheelGeo.rotateZ(Math.
 const wheelMat=new THREE.MeshStandardMaterial({color:0x121212,roughness:.72,metalness:.22});
 const CAR_MODELS=['sedan','sedan-sports','hatchback-sports','suv','suv-luxury','taxi','van','race'];
 // GLB car (CC0 Kenney Car Kit) mapped onto the gameplay contract (wheels, beacons); falls back to procedural
+// per-vehicle handling presets (accel, top speed, turn rate, grip range) → each class drives distinctly
+const HANDLING={
+  sedan:{accel:.014,top:1.0,turn:.038,gripLo:.80,gripHi:.93},
+  taxi:{accel:.013,top:.96,turn:.037,gripLo:.80,gripHi:.92},
+  race:{accel:.021,top:1.4,turn:.044,gripLo:.83,gripHi:.96},
+  'sedan-sports':{accel:.018,top:1.2,turn:.042,gripLo:.82,gripHi:.95},
+  'hatchback-sports':{accel:.018,top:1.15,turn:.046,gripLo:.81,gripHi:.94},
+  suv:{accel:.012,top:.92,turn:.032,gripLo:.78,gripHi:.90},
+  'suv-luxury':{accel:.013,top:.98,turn:.033,gripLo:.79,gripHi:.91},
+  van:{accel:.0105,top:.82,turn:.029,gripLo:.76,gripHi:.88},
+  police:{accel:.018,top:1.18,turn:.043,gripLo:.83,gripHi:.94},
+  bike:{accel:.017,top:1.15,turn:.048,gripLo:.80,gripHi:.93},
+  auto:{accel:.011,top:.72,turn:.05,gripLo:.78,gripHi:.90}
+};
 function makeCar(color,cop,forceModel){
   const id=cop?'police':(forceModel||pick(CAR_MODELS));
   const model=assets.spawn(id);
@@ -755,7 +769,7 @@ function makeCar(color,cop,forceModel){
     doorGrp.add(new THREE.Mesh(dgeo,new THREE.MeshStandardMaterial({color:0x20242b,roughness:.5,metalness:.4,envMapIntensity:.6})));
     doorGrp.position.set(-1.3,.95,.55);g.add(doorGrp);
   }
-  const ud={wheels:[...fronts,...backs],hp:100,type:'car',rad:1.6,door:doorGrp};
+  const ud={wheels:[...fronts,...backs],hp:100,type:'car',rad:1.6,door:doorGrp,cls:cop?'police':(forceModel||'sedan')};
   if(forceModel==='taxi')ud.taxi=true;
   if(cop){
     const rl=new THREE.Mesh(new THREE.BoxGeometry(.5,.22,.4),new THREE.MeshStandardMaterial({color:0xff0000,emissive:0xff0000,emissiveIntensity:1}));
@@ -793,7 +807,7 @@ function makeCarProcedural(color,cop,forceModel){
     const hl=new THREE.Mesh(new THREE.BoxGeometry(.5,.25,.1),headMat);hl.position.set(sx,.85,2.52);g.add(hl);
     const tl=new THREE.Mesh(new THREE.BoxGeometry(.5,.2,.1),tailMat);tl.position.set(sx,.85,-2.52);g.add(tl);
   }
-  const ud={wheels,hp:100,type:'car',rad:1.7,paint,door:doorGrp};
+  const ud={wheels,hp:100,type:'car',rad:1.7,paint,door:doorGrp,cls:cop?'police':(forceModel||'sedan')};
   if(forceModel==='taxi')ud.taxi=true;
   if(cop){
     const rl=new THREE.Mesh(new THREE.BoxGeometry(.5,.22,.4),new THREE.MeshPhongMaterial({color:0xff0000,emissive:0xff0000,emissiveIntensity:1}));
@@ -826,7 +840,7 @@ function makeBike(color){
   fork.position.set(0,.7,.9);fork.rotation.x=.3;lean.add(fork);
   const hl=new THREE.Mesh(new THREE.BoxGeometry(.2,.18,.08),headMat);hl.position.set(0,.95,1.05);lean.add(hl);
   const tl=new THREE.Mesh(new THREE.BoxGeometry(.18,.12,.06),tailMat);tl.position.set(0,.72,-1.05);lean.add(tl);
-  g.userData={wheels,hp:55,type:'bike',rad:1.0,lean,paint};
+  g.userData={wheels,hp:55,type:'bike',rad:1.0,lean,paint,cls:'bike'};
   scene.add(g);return g;
 }
 function makePlane(color){   // light propeller plane (flyable) — nose at +z = our forward
@@ -886,7 +900,7 @@ function makeRickshaw(){   // Bharat auto-rickshaw (3-wheeler)
   const fw=new THREE.Mesh(wg,blk);fw.position.set(0,.42,1.45);g.add(fw);wheels.push(fw);
   for(const wx of[-.78,.78]){const w=new THREE.Mesh(wg,blk);w.position.set(wx,.42,-.9);g.add(w);wheels.push(w);}
   for(const sx of[-.5,.5]){const hl=new THREE.Mesh(new THREE.BoxGeometry(.16,.16,.08),headMat);hl.position.set(sx,.95,1.86);g.add(hl);}
-  g.userData={wheels,hp:55,type:'auto',rad:1.3,paint:yellow};
+  g.userData={wheels,hp:55,type:'auto',rad:1.3,paint:yellow,cls:'auto'};
   scene.add(g);return g;
 }
 
@@ -2312,20 +2326,21 @@ function animate(){
       const bike=vehicle.userData.type==='bike';
       const fx=Math.sin(player.heading),fz=Math.cos(player.heading);
       let vf=player.vx*fx+player.vz*fz, vl=player.vx*fz-player.vz*fx;
+      const H=HANDLING[vehicle.userData.cls]||HANDLING.sedan;   // per-vehicle accel/top/turn/grip
       const boost=k.boost&&vf>.1;
-      if(k.up)vf+=(boost?(bike?.032:.026):(bike?.017:.014))*dtF;
+      if(k.up)vf+=H.accel*(boost?1.85:1)*dtF;
       if(k.dn)vf-=(vf>.05?.035:.013)*dtF;
       vf*=Math.pow(.992,dtF);
       if(!k.up&&!k.dn)vf*=Math.pow(.985,dtF);
-      vf=M.clamp(vf,-.4,boost?(bike?1.5:1.35):(bike?1.15:1.0));
+      vf=M.clamp(vf,-.4,H.top*(boost?1.35:1));
       const steerIn=(k.lf?1:0)-(k.rt?1:0);
       player.steer+=(steerIn-player.steer)*.25*dtF;
       const spd=Math.abs(vf);
       // speed-sensitive grip: whipping the wheel at speed breaks rear traction → progressive drift.
       // grip closer to 1 = more lateral velocity retained = more slide.
       const slide=Math.abs(player.steer)*Math.min(1,spd/.7);
-      const grip=k.hb?.965:M.lerp(.80,.93,slide);
-      player.heading+=player.steer*(k.hb?.055:(bike?.048:.038))*Math.sign(vf)*Math.min(1,spd/.5)*dtF;
+      const grip=k.hb?.965:M.lerp(H.gripLo,H.gripHi,slide);
+      player.heading+=player.steer*(k.hb?.055:H.turn)*Math.sign(vf)*Math.min(1,spd/.5)*dtF;
       if(k.hb)vf*=Math.pow(.985,dtF);
       vl*=Math.pow(grip,dtF);
       const nfx=Math.sin(player.heading),nfz=Math.cos(player.heading);
