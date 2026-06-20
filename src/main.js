@@ -1132,19 +1132,20 @@ function chime(){
 function speak(seed,x,z,kind){
   if(!actx)return;
   const dist=Math.hypot((x??player.x)-player.x,(z??player.z)-player.z);
-  const vol=M.clamp(1-dist/42,0,1)*(kind==='shout'?.5:.3);
+  const shout=kind==='shout';
+  const vol=M.clamp(1-dist/42,0,1)*(shout?.5:kind==='gruff'?.2:.16);   // casual talk is quiet & gentle, not a yell
   if(vol<=.02)return;
   seed=(Math.abs(seed|0)%17);
-  const base=kind==='shout'?205:kind==='gruff'?95:120+seed*7;
+  const base=shout?205:kind==='gruff'?95:120+seed*7;
   const out=actx.createGain();out.gain.value=vol;out.connect(actx.destination);
-  const n=kind==='shout'?3+(seed%3):5+(seed%4);
+  const n=shout?3+(seed%3):4+(seed%3);
   let t=actx.currentTime;
   for(let i=0;i<n;i++){
-    const o=actx.createOscillator();o.type='sawtooth';
+    const o=actx.createOscillator();o.type=shout?'sawtooth':'triangle';   // soft triangle for talk/gruff; harsh saw only for shouts
     const syl=Math.sin(seed*1.3+i*1.7)*0.5+0.5;          // per-syllable vowel pitch
     const f=base*(0.78+syl*0.85);
     o.frequency.setValueAtTime(f,t);o.frequency.linearRampToValueAtTime(f*(0.9+syl*0.3),t+0.09);
-    const bp=actx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=650+(i%3)*620+syl*400;bp.Q.value=7;
+    const bp=actx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=650+(i%3)*620+syl*400;bp.Q.value=shout?7:3;
     const g=actx.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(1,t+0.018);
     g.gain.setValueAtTime(1,t+0.09);g.gain.linearRampToValueAtTime(0,t+0.125);
     o.connect(bp).connect(g).connect(out);o.start(t);o.stop(t+0.15);
@@ -2536,7 +2537,7 @@ function animate(){
     if(!player.inCar){
       const tp=findNearestPed(4.5);
       if(tp&&!talkingPed){const prm=document.getElementById('prompt');prm.innerHTML='Press <b>T</b> to talk';prm.style.opacity=1;}
-      if(talkReq&&tp){talkingPed=tp;tp.state='talk';tp.talkT=4.5;tp.talkSeed=1+((Math.random()*15)|0);tp.speakT=0;}  // dynamic synthesized voice, no text
+      if(talkReq&&tp){talkingPed=tp;tp.state='talk';tp.talkT=4.5;tp.talkSeed=1+((Math.random()*15)|0);tp.speakT=0;tp.talkLine=pick(TALK);}  // readable line + soft synthesized voice
     }
     talkReq=false;
   }
@@ -2763,8 +2764,8 @@ function animate(){
     const bub=document.getElementById('bubble');
     if(talkingPed&&talkingPed.state==='talk'){
       _pos.set(talkingPed.x,2.3,talkingPed.z).project(camera);
-      // animated speech glyph (no text) — pulses while the synthesized voice plays
-      if(_pos.z<1){bub.textContent='🗣️';bub.style.opacity=(0.6+Math.abs(Math.sin(perf*7))*0.4);bub.style.display='block';
+      // readable dialogue line from TALK[], gently pulsing while the soft voice plays
+      if(_pos.z<1){bub.textContent=talkingPed.talkLine||'…';bub.style.opacity=(0.85+Math.abs(Math.sin(perf*5))*0.15);bub.style.display='block';
         bub.style.left=((_pos.x*.5+.5)*innerWidth)+'px';bub.style.top=((-_pos.y*.5+.5)*innerHeight)+'px';}
       else bub.style.display='none';
     }else if(bub.style.display!=='none')bub.style.display='none';
