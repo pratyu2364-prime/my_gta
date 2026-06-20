@@ -2611,6 +2611,10 @@ function animate(){
   renderer.toneMappingExposure=.92+dayF*.26+(1-dayF)*.12;
   hemi.intensity=.1+dayF*.34;     // env map now supplies ambient fill, so dial the hemisphere down
   const night=1-dayF;
+  // wet-asphalt look after dark: drop roughness & lift metalness/env reflectivity so the sky and streetlights mirror in the road
+  ground.material.roughness=M.lerp(.88,.42,night);
+  ground.material.metalness=M.lerp(.04,.34,night);
+  ground.material.envMapIntensity=M.lerp(.25,.9,night);
   for(const m of bldMats)m.emissiveIntensity=night*.9;
   headMat.emissiveIntensity=night*1.4;
   lampHead.emissiveIntensity=night*1.6;
