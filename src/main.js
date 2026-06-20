@@ -1785,7 +1785,7 @@ function updateFlyHeads(dtF,dt){
 }
 function explode(p){
   // billowing fireball: dark smoke grows & rises, bright embers fall and bounce
-  for(let i=0;i<16;i++)spawnP(p.x,1.5,p.z,pick([0x333333,0x555555,0x222222]),rnd(.7,1.6),rnd(1.0,1.8),rnd(-.4,.4),rnd(.25,.6),rnd(-.4,.4),{grow:1.035,drag:.92,grav:.004});
+  for(let i=0;i<16;i++)spawnP(p.x,1.5,p.z,pick([0x333333,0x555555,0x222222]),rnd(.7,1.6),rnd(1.0,1.8),rnd(-.4,.4),rnd(.25,.6),rnd(-.4,.4),{grow:1.035,drag:.92,grav:-.006});   // hot smoke rises
   for(let i=0;i<14;i++)spawnP(p.x,1.5,p.z,pick([0xff6a00,0xffae00,0xff2200,0xfff1b0]),rnd(.3,.8),rnd(.6,1.1),rnd(-.7,.7),rnd(.3,.9),rnd(-.7,.7),{grow:.95,bounce:.3,drag:.85,grav:.02});
   const l=new THREE.PointLight(0xff8800,6,60);l.position.set(p.x,4,p.z);scene.add(l);
   setTimeout(()=>scene.remove(l),350);crashSound(1);
@@ -2324,8 +2324,8 @@ function animate(){
       }
       vehicle.userData.wheels.forEach((w,i)=>{w.rotation.x+=vf*.7*dtF;if(!bike&&i<2)w.rotation.y=player.steer*.42;});
       if(boost&&frame%3===0)spawnP(pp.x-nfx*2.6,.5,pp.z-nfz*2.6,0x66bbff,.3,.3,rnd(-.05,.05),.05,rnd(-.05,.05));
-      if(vehicle.userData.hp<40&&frame%6===0)spawnP(pp.x+nfx*2,1.3,pp.z+nfz*2,0x555555,.45,1,rnd(-.03,.03),.12,rnd(-.03,.03));
-      if(frame%9===0&&Math.abs(vf)<.3&&!bike)spawnP(pp.x-nfx*2.7,.4,pp.z-nfz*2.7,0x888888,.14,.5,0,.04,0);
+      if(vehicle.userData.hp<40&&frame%6===0)spawnP(pp.x+nfx*2,1.3,pp.z+nfz*2,0x555555,.45,1,rnd(-.03,.03),.12,rnd(-.03,.03),{grav:-.004,grow:1.03,drag:.9});   // damage smoke rises & billows
+      if(frame%9===0&&Math.abs(vf)<.3&&!bike)spawnP(pp.x-nfx*2.7,.4,pp.z-nfz*2.7,0x888888,.14,.5,0,.04,0,{grav:-.002,grow:1.04,drag:.92});   // idle exhaust puff drifts up
       // shunt traffic
       for(const a of aiCars){
         const rr=rad+a.mesh.userData.rad;
@@ -2403,7 +2403,7 @@ function animate(){
       // nudge props on foot
       for(const pr of dynProps){if(pr.dead)continue;
         const dx=player.x-pr.x,dz=player.z-pr.z,d=Math.hypot(dx,dz);
-        if(d<.55+pr.rad){const sp=Math.hypot(player.vx,player.vz);knockProp(pr,-dx/(d||1),-dz/(d||1),sp*.9+.05);}}
+        if(d<.55+pr.rad){const hs=Math.hypot(player.vx,player.vz);knockProp(pr,-dx/(d||1),-dz/(d||1),hs*.9+.05);}}
       // gun pickups
       for(const g of pickups){
         if(Math.hypot(g.position.x-player.x,g.position.z-player.z)<2.2){
