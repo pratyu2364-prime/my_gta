@@ -4,6 +4,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { AssetManager } from './core/assets.js';
 
 function showError(m){document.getElementById('err').style.display='flex';document.getElementById('errmsg').textContent=m;}
@@ -123,7 +125,13 @@ scene.fog=new THREE.Fog(0x87ceeb,120,900);
 let composer=null,bloomPass=null;
 if(EffectComposer&&UnrealBloomPass&&RenderPass&&ShaderPass)try{
   composer=new EffectComposer(renderer);
-  composer.addPass(new RenderPass(scene,camera));
+  // SSAO renders the scene itself (beauty * ambient occlusion) → grounds objects with soft contact
+  // shadows in crevices/under cars. Falls back to a plain RenderPass if the CDN module is missing.
+  if(SSAOPass){
+    const ssao=new SSAOPass(scene,camera,innerWidth,innerHeight);
+    ssao.kernelRadius=8; ssao.minDistance=.0008; ssao.maxDistance=.12; ssao.output=SSAOPass.OUTPUT.Default;
+    composer.addPass(ssao);
+  }else composer.addPass(new RenderPass(scene,camera));
   bloomPass=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),.55,.6,.82); // strength, radius, threshold
   composer.addPass(bloomPass);
   const GradeShader={
@@ -139,6 +147,9 @@ if(EffectComposer&&UnrealBloomPass&&RenderPass&&ShaderPass)try{
       +'gl_FragColor=vec4(c,1.0);}'
   };
   composer.addPass(new ShaderPass(GradeShader));
+  // SMAA last → restores crisp edges that `antialias:true` cannot provide once we render
+  // through an offscreen composer target (MSAA on the canvas is bypassed by post-processing).
+  if(SMAAPass)composer.addPass(new SMAAPass(innerWidth,innerHeight));
   composer.setSize(innerWidth,innerHeight);
 }catch(e){composer=null;}
 function renderFrame(){composer?composer.render():renderer.render(scene,camera);}
@@ -1738,18 +1749,24 @@ function meleeAttack(){
 // ---------- particles ----------
 const parts=[];
 const partGeo=new THREE.SphereGeometry(1,6,5);
-function spawnP(x,y,z,color,size,life,vx,vy,vz){
-  if(parts.length>140)return;
+// opts: {grav, drag(horiz damp/frame), grow(scale/frame, <1 shrinks), bounce(restitution 0..1)}
+function spawnP(x,y,z,color,size,life,vx,vy,vz,o){
+  if(parts.length>180)return;o=o||{};
   const m=new THREE.Mesh(partGeo,new THREE.MeshBasicMaterial({color,transparent:true}));
   m.position.set(x,y,z);m.scale.setScalar(size);
-  parts.push({m,vx,vy,vz,life,max:life});scene.add(m);
+  parts.push({m,vx,vy,vz,life,max:life,
+    grav:o.grav==null?.012:o.grav, drag:o.drag==null?1:o.drag,
+    grow:o.grow==null?1.02:o.grow, bounce:o.bounce==null?0:o.bounce});
+  scene.add(m);
 }
-function sparks(p){for(let i=0;i<5;i++)spawnP(p.x,1,p.z,0xffd23e,.15,.4,rnd(-.3,.3),rnd(.1,.4),rnd(-.3,.3));}
-function spawnBlood(p){for(let i=0;i<6;i++)spawnP(p.x,.4,p.z,0x991111,.2,.8,rnd(-.15,.15),rnd(.05,.25),rnd(-.15,.15));}
+// sparks: shoot out, bounce off the ground, shrink and burn out fast
+function sparks(p){for(let i=0;i<7;i++)spawnP(p.x,1,p.z,pick([0xffd23e,0xffae00,0xfff1b0]),rnd(.1,.18),rnd(.3,.5),rnd(-.45,.45),rnd(.15,.5),rnd(-.45,.45),{grow:.93,bounce:.38,drag:.82,grav:.022});}
+// blood: heavier droplets that splat and settle on the ground
+function spawnBlood(p){for(let i=0;i<7;i++)spawnP(p.x,.4,p.z,pick([0x991111,0x7a0d0d,0xb01a1a]),rnd(.14,.24),rnd(.7,1.0),rnd(-.2,.2),rnd(.05,.3),rnd(-.2,.2),{grow:.97,bounce:.14,drag:.74,grav:.024});}
 // dismemberment: gore fountain + a real head mesh that flies off, tumbles and lands
 const flyHeads=[];
 function decapFx(x,z,skinHex){
-  for(let i=0;i<16;i++)spawnP(x,1.7,z,pick([0x8a0f0f,0xb01515,0x6e0a0a]),rnd(.14,.3),rnd(.5,1.0),rnd(-.4,.4),rnd(.3,.7),rnd(-.4,.4));
+  for(let i=0;i<16;i++)spawnP(x,1.7,z,pick([0x8a0f0f,0xb01515,0x6e0a0a]),rnd(.14,.3),rnd(.5,1.0),rnd(-.4,.4),rnd(.3,.7),rnd(-.4,.4),{grow:.96,bounce:.16,drag:.78,grav:.024});
   const head=new THREE.Group();
   const sk=new THREE.Mesh(headGeo,new THREE.MeshStandardMaterial({color:skinHex||0xd9a173,roughness:.8,metalness:.05}));
   const hr=new THREE.Mesh(hairGeo,new THREE.MeshStandardMaterial({color:0x2b1b0e,roughness:.9}));hr.position.y=.05;
@@ -1767,7 +1784,9 @@ function updateFlyHeads(dtF,dt){
     h.m.rotation.x+=h.ax*dtF;h.m.rotation.z+=h.az*dtF;}
 }
 function explode(p){
-  for(let i=0;i<22;i++)spawnP(p.x,1.5,p.z,pick([0xff6a00,0xffae00,0x333333,0xff2200]),rnd(.5,1.6),rnd(.8,1.6),rnd(-.5,.5),rnd(.2,.8),rnd(-.5,.5));
+  // billowing fireball: dark smoke grows & rises, bright embers fall and bounce
+  for(let i=0;i<16;i++)spawnP(p.x,1.5,p.z,pick([0x333333,0x555555,0x222222]),rnd(.7,1.6),rnd(1.0,1.8),rnd(-.4,.4),rnd(.25,.6),rnd(-.4,.4),{grow:1.035,drag:.92,grav:.004});
+  for(let i=0;i<14;i++)spawnP(p.x,1.5,p.z,pick([0xff6a00,0xffae00,0xff2200,0xfff1b0]),rnd(.3,.8),rnd(.6,1.1),rnd(-.7,.7),rnd(.3,.9),rnd(-.7,.7),{grow:.95,bounce:.3,drag:.85,grav:.02});
   const l=new THREE.PointLight(0xff8800,6,60);l.position.set(p.x,4,p.z);scene.add(l);
   setTimeout(()=>scene.remove(l),350);crashSound(1);
 }
@@ -2519,8 +2538,15 @@ function animate(){
   for(let i=parts.length-1;i>=0;i--){
     const p=parts[i];p.life-=dt;
     if(p.life<=0){scene.remove(p.m);p.m.material.dispose();parts.splice(i,1);continue;}
-    p.m.position.x+=p.vx*dtF;p.m.position.y+=p.vy*dtF;p.m.position.z+=p.vz*dtF;
-    p.vy-=.012*dtF;p.m.material.opacity=p.life/p.max;p.m.scale.multiplyScalar(Math.pow(1.02,dtF));
+    p.vy-=p.grav*dtF;
+    const ps=p.m.position;ps.x+=p.vx*dtF;ps.y+=p.vy*dtF;ps.z+=p.vz*dtF;
+    if(p.drag!==1){const d=Math.pow(p.drag,dtF);p.vx*=d;p.vz*=d;}
+    const gy=groundHeightAt(ps.x,ps.z)+p.m.scale.x*.5;       // rest on whatever surface is below
+    if(ps.y<gy){ps.y=gy;
+      if(p.bounce>0&&p.vy<-.05){p.vy=-p.vy*p.bounce;p.vx*=.6;p.vz*=.6;}   // bounce & lose energy
+      else{p.vy=0;const f=Math.pow(.45,dtF);p.vx*=f;p.vz*=f;}              // settle with ground friction
+    }
+    p.m.scale.multiplyScalar(Math.pow(p.grow,dtF));p.m.material.opacity=p.life/p.max;
   }
 
   // --- taxi career ---
@@ -2544,6 +2570,8 @@ function animate(){
     sky.position.set(player.x,0,player.z);
   }
   sun.intensity=Math.max(0,el)*1.15;
+  // dynamic exposure: brighter at high noon, lifted at night so the city stays readable (cinematic depth)
+  renderer.toneMappingExposure=.92+dayF*.26+(1-dayF)*.12;
   hemi.intensity=.1+dayF*.34;     // env map now supplies ambient fill, so dial the hemisphere down
   const night=1-dayF;
   for(const m of bldMats)m.emissiveIntensity=night*.9;
