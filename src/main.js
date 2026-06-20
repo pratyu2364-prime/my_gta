@@ -2360,8 +2360,13 @@ function animate(){
         moveZ=mfx*Math.cos(worldAim)+mst*Math.cos(worldAim+Math.PI/2);
         const ml=Math.hypot(moveX,moveZ)||1;moveX/=ml;moveZ/=ml;
       }
-      const sp=(k.boost?.3:.16)*(player.airborne?.85:1);
-      player.vx=moveX*sp;player.vz=moveZ*sp;
+      const sp=(k.boost?.3:.16);
+      // momentum: ease velocity toward the desired direction instead of snapping — brisk accel/stop on the
+      // ground, near-zero air control so a jump keeps its launch momentum (no mid-air direction snapping).
+      const dvx=moveX*sp,dvz=moveZ*sp;
+      const acc=player.airborne?.07:(moving?.34:.5);
+      player.vx+=(dvx-player.vx)*Math.min(1,acc*dtF);
+      player.vz+=(dvz-player.vz)*Math.min(1,acc*dtF);
       const pp={x:player.x+player.vx*dtF,z:player.z+player.vz*dtF,vx:player.vx,vz:player.vz};
       resolveCircle(pp,.5);if(player.y<1.0)resolveActors(pp,.5);   // skip actor push-out while up on a car roof
       player.x=M.clamp(pp.x,-WORLD+2,WORLD-2);player.z=M.clamp(pp.z,-WORLD+2,WORLD-2);
@@ -2379,7 +2384,8 @@ function animate(){
       if(sup.car&&!player.airborne){if(player._rx!==undefined){player.x+=sup.car.position.x-player._rx;player.z+=sup.car.position.z-player._rz;}player._rx=sup.car.position.x;player._rz=sup.car.position.z;}
       else player._rx=undefined;
       char.position.set(player.x,player.y,player.z);char.rotation.y=player.heading;
-      const s=Math.sin(perf*(k.boost?16:10))*(moving?1:0),L=char.userData.limbs;
+      const gait=Math.min(1,Math.hypot(player.vx,player.vz)/.16);   // stride amplitude follows real speed → feet ease to a stop with momentum
+      const s=Math.sin(perf*(k.boost?16:10))*gait,L=char.userData.limbs;
       L[0].rotation.x=s*.7;L[1].rotation.x=-s*.7;
       // hold the gun out and aim with the camera when armed
       const gm=char.userData.gunMount;
