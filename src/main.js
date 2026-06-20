@@ -85,6 +85,7 @@ window.__probe=()=>{const st={parked:parked.length,ai:aiCars.length};
     st.flowDir=river?river.flow:0;st.deckH=decks[0]?decks[0].h:0;st.playerY=+player.y.toFixed(2);st.airborne=player.airborne;
     st.ghAtDeck=decks[0]?+groundHeightAt((decks[0].x0+decks[0].x1)/2,(decks[0].z0+decks[0].z1)/2).toFixed(2):0;
     st.peds=peds.length;st.gangs=gangs.length;st.aggro=gangs.filter(g=>g.state==='aggro').length;
+    st.vigilActive=vigil.active;st.vigilKills=vigil.kills;st.vigilGoal=vigil.goal;
     st.fleeing=peds.filter(p=>p.state==='flee').length;
     st.wounded=peds.filter(p=>p.wounded).length;st.decapped=peds.filter(p=>p.decap).length;st.flyHeads=flyHeads.length;
     st.footY=+player.y.toFixed(2);st.airborne=player.airborne;st.knives=pickups.filter(g=>g.userData.kind==='knife').length;
@@ -1321,7 +1322,9 @@ const CHEATS={
   WHEELS:()=>spawnCheatVeh(makeCar(0xff2d2d,false,'race'),'🏎 RACER SPAWNED'),
   CHOPPER:()=>spawnCheatVeh(makeHeli(0x111111),'🚁 CHOPPER SPAWNED'),
   FLY:()=>spawnCheatVeh(makePlane(0xffffff),'✈ PLANE SPAWNED'),
-  BANG:()=>{const a=player.heading;explode({x:player.x+Math.sin(a)*6,z:player.z+Math.cos(a)*6});}
+  BANG:()=>{const a=player.heading;explode({x:player.x+Math.sin(a)*6,z:player.z+Math.cos(a)*6});},
+  VIGI:()=>startVigilante(),
+  PEACE:()=>stopVigilante()
 };
 addEventListener('keydown',e=>{
   if(!e.key||e.key.length!==1||!/[a-z]/i.test(e.key))return;
@@ -1368,6 +1371,15 @@ for(const Lm of landmarks)if(Lm.type==='police'){
 
 // ---------- gangs (hostile NPCs that take offence, draw weapons and chase) ----------
 const gangs=[];
+// ---------- vigilante mission: cull gang members in escalating waves for cash ----------
+const vigil={active:false,kills:0,goal:5};
+function startVigilante(){if(vigil.active)return;vigil.active=true;vigil.kills=0;vigil.goal=5;chime();showMsg('🎯 VIGILANTE — take down '+vigil.goal+' gangsters!');}
+function stopVigilante(){if(!vigil.active)return;vigil.active=false;showMsg('🕊 Vigilante ended');}
+function vigilKill(){
+  vigil.kills++;money+=600;
+  if(vigil.kills>=vigil.goal){money+=4000;vigil.goal+=2;vigil.kills=0;chime();showMsg('💰 Wave cleared! +4000 — next target: '+vigil.goal);}
+  else showMsg('🎯 Vigilante '+vigil.kills+'/'+vigil.goal+'  (+600)');
+}
 const GANGc=[0x14110f,0x3a0d0d,0x10203a,0x14331a,0x2a1133];   // dark gang colours
 function spawnGang(x,z){
   const g=buildCharacter(pick(SKINc),pick(GANGc),0x15171c,pick(HAIRc),false);
@@ -1385,6 +1397,7 @@ function killGang(g){
   if(g.state==='dead')return;g.state='dead';
   g.mesh.rotation.set(Math.PI/2,g.mesh.rotation.y,0);g.mesh.position.y=.32;
   spawnBlood({x:g.x,z:g.z});
+  if(vigil.active)vigilKill();
   setTimeout(()=>{scene.remove(g.mesh);const i=gangs.indexOf(g);if(i>=0)gangs.splice(i,1);},9000);
 }
 function decapGang(g){
@@ -2762,7 +2775,7 @@ function animate(){
     document.getElementById('money').textContent='$'+money;
     const hrs=Math.floor(tod*24),min=Math.floor((tod*24%1)*60);
     document.getElementById('clock').textContent=String(hrs).padStart(2,'0')+':'+String(min).padStart(2,'0');
-    document.getElementById('obj').textContent=taxi.active?
+    document.getElementById('obj').textContent=vigil.active?('🎯 VIGILANTE  '+vigil.kills+'/'+vigil.goal):taxi.active?
       (taxi.phase==='ride'?'TAXI · '+Math.round(Math.hypot(player.x-taxi.dest.x,player.z-taxi.dest.z))+'m to drop-off':
        taxi.phase==='toCar'?'TAXI · passenger boarding…':'TAXI · fare in progress')
       :((vehicle&&vehicle.userData.taxi)?'Press 1 to start a taxi fare':'');
