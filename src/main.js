@@ -98,6 +98,7 @@ window.__probe=()=>{const st={parked:parked.length,ai:aiCars.length};
     const heli=parked.find(v=>v.userData.type==='heli');if(heli){st.heliX=+heli.position.x.toFixed(0);st.heliZ=+heli.position.z.toFixed(0);}
     st.airportCx=airport?+airport.cx.toFixed(0):null;st.airportCz=airport?+airport.cz.toFixed(0):null;
     st.raceCx=race?+race.cx.toFixed(0):null;st.raceCz=race?+race.cz.toFixed(0):null;st.raceWp=race&&race.wp?race.wp.length:0;
+    st.raceActive=race.active;st.raceLap=race.lap||0;st.racePos=race.pos||0;st.racers=racers.length;
     st.inCar=player.inCar;st.vehType=vehicle?vehicle.userData.type:null;st.inPlane=player.inCar&&vehicle&&vehicle.userData.type==='plane';
     st.px=+player.x.toFixed(2);st.pz=+player.z.toFixed(2);st.vehHp=vehicle?+vehicle.userData.hp.toFixed(1):null;
     st.vehSpd=vehicle&&vehicle.userData.spd!=null?+vehicle.userData.spd.toFixed(2):null;st.vy=+player.vy.toFixed(2);
@@ -1353,7 +1354,8 @@ const CHEATS={
   FLY:()=>spawnCheatVeh(makePlane(0xffffff),'✈ PLANE SPAWNED'),
   BANG:()=>{const a=player.heading;explode({x:player.x+Math.sin(a)*6,z:player.z+Math.cos(a)*6});},
   VIGI:()=>startVigilante(),
-  PEACE:()=>stopVigilante()
+  PEACE:()=>stopVigilante(),
+  RACE:()=>startRace()
 };
 addEventListener('keydown',e=>{
   if(!e.key||e.key.length!==1||!/[a-z]/i.test(e.key))return;
@@ -1936,6 +1938,39 @@ function paxWalk(tx,tz,dtF,speed){
 function taxiDoor(open,dtF){const dr=vehicle&&vehicle.userData.door;if(dr)dr.rotation.y+=((open?1.15:0)-dr.rotation.y)*.2*dtF;}
 function endTaxiJob(){if(taxi.pax){if(taxi.pax.parent)taxi.pax.parent.remove(taxi.pax);taxi.pax=null;}
   taxi.active=false;taxi.phase='';taxiMarker.visible=false;}
+// ---------- race mission logic (AI racers follow race.wp; player races for placement cash) ----------
+const racers=[];const RACE_LAPS=2;
+function startRace(){
+  if(race.active)return;
+  race.active=true;race.lap=0;race.pos=1;race.lastWp=0;race.t=0;
+  const a0=race.wp[0],a1=race.wp[1];const dx=a1.x-a0.x,dz=a1.z-a0.z,L=Math.hypot(dx,dz)||1;const ux=dx/L,uz=dz/L,px=-uz,pz=ux;
+  for(let i=0;i<3;i++){const m=makeCar(pick([0xff3030,0x30a0ff,0x30d060]),false,'race');
+    m.position.set(a0.x-ux*(6+i*5)+px*(i%2?2.5:-2.5),0,a0.z-uz*(6+i*5)+pz*(i%2?2.5:-2.5));
+    m.rotation.y=Math.atan2(ux,uz);racers.push({mesh:m,wpIdx:1,lap:0,spd:0});}
+  showMsg('🏁 RACE! '+RACE_LAPS+' laps — beat the field!');
+}
+function endRace(place){
+  race.active=false;for(const r of racers)scene.remove(r.mesh);racers.length=0;
+  if(place!=null){const prize=place===1?8000:place===2?3000:place===3?1500:500;money+=prize;chime();showMsg('🏆 Finished P'+place+'  +'+prize);}
+}
+function raceUpdate(dt,dtF){
+  if(!race.active)return;race.t+=dt;
+  for(const r of racers){
+    const tgt=race.wp[r.wpIdx],dx=tgt.x-r.mesh.position.x,dz=tgt.z-r.mesh.position.z,d=Math.hypot(dx,dz);
+    let dh=Math.atan2(dx,dz)-r.mesh.rotation.y;while(dh>Math.PI)dh-=2*Math.PI;while(dh<-Math.PI)dh+=2*Math.PI;
+    r.mesh.rotation.y+=dh*Math.min(1,.12*dtF);r.spd=Math.min(.92,r.spd+.02*dtF);
+    const mv=r.spd*dtF;r.mesh.position.x+=Math.sin(r.mesh.rotation.y)*mv;r.mesh.position.z+=Math.cos(r.mesh.rotation.y)*mv;
+    r.mesh.userData.wheels.forEach(w=>w.rotation.x+=r.spd*.6*dtF);
+    if(d<7){r.wpIdx++;if(r.wpIdx>=race.wp.length){r.wpIdx=0;r.lap++;}}
+  }
+  const nx=race.wp[(race.lastWp+1)%race.wp.length];
+  if(pdist(nx.x,nx.z)<10){race.lastWp=(race.lastWp+1)%race.wp.length;if(race.lastWp===0)race.lap++;}
+  const pScore=race.lap*race.wp.length+race.lastWp;let ahead=0;
+  for(const r of racers)if(r.lap*race.wp.length+r.wpIdx>pScore)ahead++;
+  race.pos=ahead+1;
+  if(race.lap>=RACE_LAPS)endRace(race.pos);
+  else if(!player.inCar&&pdist(race.cx,race.cz)>150){showMsg('Race abandoned');endRace(null);}
+}
 function taxiUpdate(dt,dtF){
   if(!taxi.active)return;
   const v=vehicle;
@@ -2683,6 +2718,10 @@ function animate(){
   if(!dead)taxiUpdate(dt,dtF);
   if(taxiMarker.visible){taxiMarker.rotation.y+=dt;taxiMarker.children[0].position.y=.6+Math.sin(perf*3)*.25;}
   if(race.marker&&!race.active){race.marker.rotation.y+=dt*1.5;race.marker.children[0].position.y=.6+Math.sin(perf*3)*.3;}
+  if(!dead){
+    if(!race.active&&player.inCar&&vehicle&&vehicle.userData.type==='car'&&pdist(race.wp[0].x,race.wp[0].z)<6)startRace();   // drive into the start ring
+    raceUpdate(dt,dtF);
+  }
 
   // --- day/night (smooth) ---
   const el=Math.sin((tod-.25)*Math.PI*2);
@@ -2810,7 +2849,7 @@ function animate(){
     document.getElementById('money').textContent='$'+money;
     const hrs=Math.floor(tod*24),min=Math.floor((tod*24%1)*60);
     document.getElementById('clock').textContent=String(hrs).padStart(2,'0')+':'+String(min).padStart(2,'0');
-    document.getElementById('obj').textContent=vigil.active?('🎯 VIGILANTE  '+vigil.kills+'/'+vigil.goal):taxi.active?
+    document.getElementById('obj').textContent=race.active?('🏁 LAP '+Math.min(race.lap+1,RACE_LAPS)+'/'+RACE_LAPS+' · P'+(race.pos||1)+'/'+(racers.length+1)):vigil.active?('🎯 VIGILANTE  '+vigil.kills+'/'+vigil.goal):taxi.active?
       (taxi.phase==='ride'?'TAXI · '+Math.round(Math.hypot(player.x-taxi.dest.x,player.z-taxi.dest.z))+'m to drop-off':
        taxi.phase==='toCar'?'TAXI · passenger boarding…':'TAXI · fare in progress')
       :((vehicle&&vehicle.userData.taxi)?'Press 1 to start a taxi fare':'');
