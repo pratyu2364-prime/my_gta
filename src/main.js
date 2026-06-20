@@ -1791,6 +1791,22 @@ function explode(p){
   const l=new THREE.PointLight(0xff8800,6,60);l.position.set(p.x,4,p.z);scene.add(l);
   setTimeout(()=>scene.remove(l),350);crashSound(1);addShake(1.1);
 }
+// ---------- tyre-skid decals (pooled flat ground quads laid down while drifting/handbraking) ----------
+const skids=[],SKIDMAX=100;
+const skidGeo=new THREE.PlaneGeometry(.34,.72);
+function dropSkid(x,z,head){
+  let m;
+  if(skids.length>=SKIDMAX)m=skids.shift();                       // recycle the oldest mark
+  else{m=new THREE.Mesh(skidGeo,new THREE.MeshBasicMaterial({color:0x0a0a0a,transparent:true,depthWrite:false}));scene.add(m);}
+  m.rotation.set(-Math.PI/2,0,-head);                             // lay flat, align length with travel
+  m.position.set(x,groundHeightAt(x,z)+.02,z);
+  m.material.opacity=.5;m.userData.life=7;skids.push(m);
+}
+function updateSkids(dt){
+  for(let i=skids.length-1;i>=0;i--){const m=skids[i];m.userData.life-=dt;
+    if(m.userData.life<=0){scene.remove(m);m.material.dispose();skids.splice(i,1);continue;}
+    m.material.opacity=Math.min(.5,m.userData.life/7*.5);}        // fade out over its lifetime
+}
 
 // ---------- taxi career (replaces the old yellow-marker delivery mission) ----------
 let taxiMarker=null;
@@ -2328,6 +2344,11 @@ function animate(){
       if(boost&&frame%3===0)spawnP(pp.x-nfx*2.6,.5,pp.z-nfz*2.6,0x66bbff,.3,.3,rnd(-.05,.05),.05,rnd(-.05,.05));
       if(vehicle.userData.hp<40&&frame%6===0)spawnP(pp.x+nfx*2,1.3,pp.z+nfz*2,0x555555,.45,1,rnd(-.03,.03),.12,rnd(-.03,.03),{grav:-.004,grow:1.03,drag:.9});   // damage smoke rises & billows
       if(frame%9===0&&Math.abs(vf)<.3&&!bike)spawnP(pp.x-nfx*2.7,.4,pp.z-nfz*2.7,0x888888,.14,.5,0,.04,0,{grav:-.002,grow:1.04,drag:.92});   // idle exhaust puff drifts up
+      // tyre skids: lay marks under the rear axle while handbraking or breaking traction at speed
+      if(!bike&&!player.airborne&&spd>.25&&(k.hb||slide>.45)&&frame%2===0){
+        const rx=pp.x-nfx*1.3,rz=pp.z-nfz*1.3,sx=Math.cos(player.heading)*.7,sz=-Math.sin(player.heading)*.7;
+        dropSkid(rx+sx,rz+sz,player.heading);dropSkid(rx-sx,rz-sz,player.heading);
+      }
       // shunt traffic
       for(const a of aiCars){
         const rr=rad+a.mesh.userData.rad;
@@ -2533,7 +2554,7 @@ function animate(){
   for(const c of cows)cowUpdate(c,dtF);
   for(const g of gangs)gangUpdate(g,dtF);
   for(const cw of copWalkers)copWalkerUpdate(cw,dtF);
-  dynUpdate(dtF);updateFlyHeads(dtF,dt);
+  dynUpdate(dtF);updateFlyHeads(dtF,dt);updateSkids(dt);
   if(river&&river.waterMat)river.waterMat.uniforms.uTime.value=perf; // flowing water animation
   for(const p of peds)pedUpdate(p,dtF);
   updateCrowd();
