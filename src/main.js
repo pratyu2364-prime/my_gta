@@ -2197,7 +2197,8 @@ function heliUpdate(k,dt,dtF){
   const nfx=Math.sin(player.heading),nfz=Math.cos(player.heading);
   player.vx=nfx*ud.spd;player.vz=nfz*ud.spd;
   let nx=v.position.x+player.vx*dtF,nz=v.position.z+player.vz*dtF;
-  if(player.y<22){const pp={x:nx,z:nz,vx:player.vx,vz:player.vz};const imp=resolveCircle(pp,ud.rad);
+  // only collide with buildings in the mid-air band — on the ground / low takeoff the chopper maneuvers freely (no ground-collision fighting its controls)
+  if(player.y>6&&player.y<26){const pp={x:nx,z:nz,vx:player.vx,vz:player.vz};const imp=resolveCircle(pp,ud.rad);
     nx=pp.x;nz=pp.z;if(imp>.4){ud.spd*=.5;damageVehicle(imp*16);crashSound(imp);}}
   nx=M.clamp(nx,-WORLD+6,WORLD-6);nz=M.clamp(nz,-WORLD+6,WORLD-6);
   v.position.set(nx,player.y,nz);player.x=nx;player.z=nz;
@@ -2427,6 +2428,9 @@ function animate(){
         const dx=pp.x-pr.x,dz=pp.z-pr.z,d=Math.hypot(dx,dz);
         if(d<rad+pr.rad){const rel=Math.hypot(player.vx,player.vz);knockProp(pr,-dx/(d||1),-dz/(d||1),rel*2.6+.35);}}
     }else if(!jack){
+      // safety: on foot the avatar must always be in the scene & visible — rescues it from any stuck mount/exit state
+      if(char.parent!==scene){scene.add(char);char.scale.setScalar(1);}
+      char.visible=true;
       // third-person: the mouse turns BOTH the camera and the body; WASD moves relative to the look direction
       const worldAim=player.heading+camYaw;
       const mfx=(k.up?1:0)-(k.dn?1:0), mst=(k.lf?1:0)-(k.rt?1:0), moving=!!(mfx||mst);
