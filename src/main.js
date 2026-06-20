@@ -1789,7 +1789,7 @@ function explode(p){
   for(let i=0;i<16;i++)spawnP(p.x,1.5,p.z,pick([0x333333,0x555555,0x222222]),rnd(.7,1.6),rnd(1.0,1.8),rnd(-.4,.4),rnd(.25,.6),rnd(-.4,.4),{grow:1.035,drag:.92,grav:-.006});   // hot smoke rises
   for(let i=0;i<14;i++)spawnP(p.x,1.5,p.z,pick([0xff6a00,0xffae00,0xff2200,0xfff1b0]),rnd(.3,.8),rnd(.6,1.1),rnd(-.7,.7),rnd(.3,.9),rnd(-.7,.7),{grow:.95,bounce:.3,drag:.85,grav:.02});
   const l=new THREE.PointLight(0xff8800,6,60);l.position.set(p.x,4,p.z);scene.add(l);
-  setTimeout(()=>scene.remove(l),350);crashSound(1);
+  setTimeout(()=>scene.remove(l),350);crashSound(1);addShake(1.1);
 }
 
 // ---------- taxi career (replaces the old yellow-marker delivery mission) ----------
@@ -2157,7 +2157,8 @@ function drawMapIcon(g,x,y,r,type){
     g.moveTo(x,y-r*.05);g.lineTo(x-r*.6,y+r*.22);g.moveTo(x,y-r*.05);g.lineTo(x+r*.6,y+r*.22);
     g.moveTo(x,y+r*.4);g.lineTo(x-r*.26,y+r*.6);g.moveTo(x,y+r*.4);g.lineTo(x+r*.26,y+r*.6);g.stroke();}
 }
-let healCool=0,insideLM=null;
+let healCool=0,insideLM=null,shake=0;
+function addShake(a){shake=Math.min(1.3,shake+a);}   // decaying camera kick on impacts
 function checkLandmarks(dt){
   insideLM=null;
   const onFoot=!player.inCar;
@@ -2311,8 +2312,8 @@ function animate(){
       vehicle.position.set(pp.x,player.y,pp.z);
       vehicle.rotation.y=player.heading;
       player.x=pp.x;player.z=pp.z;
-      if(imp>.15){damageVehicle(imp*26);crashSound(imp);sparks(vehicle.position);}
-      if(landImpact<-6){damageVehicle(Math.min(18,-landImpact*1.2));crashSound(.6);sparks(vehicle.position);}
+      if(imp>.15){damageVehicle(imp*26);crashSound(imp);sparks(vehicle.position);addShake(Math.min(1,imp*.9));}
+      if(landImpact<-6){damageVehicle(Math.min(18,-landImpact*1.2));crashSound(.6);sparks(vehicle.position);addShake(Math.min(1,-landImpact*.06));}
       if(bike){
         vehicle.userData.lean.rotation.z=M.lerp(vehicle.userData.lean.rotation.z,-player.steer*Math.min(1,Math.abs(vf))*.45,.15);
       }else{
@@ -2336,7 +2337,7 @@ function animate(){
           vehicle.position.x+=nx*(rr-d)*.6;vehicle.position.z+=nz*(rr-d)*.6;
           a.mesh.position.x-=nx*(rr-d)*.4;a.mesh.position.z-=nz*(rr-d)*.4;
           player.vx*=.92;player.vz*=.92;
-          if(rel>.4){damageVehicle(rel*9);crashSound(rel*.7);sparks(vehicle.position);
+          if(rel>.4){damageVehicle(rel*9);crashSound(rel*.7);sparks(vehicle.position);addShake(Math.min(.8,rel*.6));
             if(crimeCool<=0){addWanted(1);crimeCool=4;}}
         }
       }
@@ -2637,6 +2638,13 @@ function animate(){
   if(player.inCar&&spd>.6){ // speed rumble
     camera.position.y+=(Math.random()-.5)*spd*.05;
     camera.position.x+=(Math.random()-.5)*spd*.04;
+  }
+  if(shake>.001){ // impact shake: punchy then settles (s² ease-out), frame-rate independent decay
+    const s=shake*shake;
+    camera.position.x+=(Math.random()-.5)*s*1.3;
+    camera.position.y+=(Math.random()-.5)*s*1.1;
+    camera.position.z+=(Math.random()-.5)*s*1.3;
+    shake*=Math.pow(.86,dtF);
   }
   // never let the camera dip below the surface beneath it: the ground is a single-sided plane, so going under it
   // shows nothing but the blue sky background — this was the "screen turns blue, camera stuck on sky" bug after exiting.
