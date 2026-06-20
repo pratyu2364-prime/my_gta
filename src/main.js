@@ -1238,12 +1238,17 @@ spawnPickup(spawnX+5,spawnZ-5,'knife');    // a knife within reach of spawn
 const bullets=[];
 const bulletGeo=new THREE.BoxGeometry(.09,.09,.55);
 const bulletMatY=new THREE.MeshBasicMaterial({color:0xffdd66});
+// civilians within radius bolt away from a gunshot (flee logic already runs them away from the player)
+function scarePeds(x,z,r){const r2=r*r;
+  for(const p of peds){if(p.state==='down'||p.state==='talk')continue;
+    const dx=p.x-x,dz=p.z-z;if(dx*dx+dz*dz<r2){p.state='flee';if(!(p.timer>3.5))p.timer=3.5;}}}
 function shoot(x,y,z,ang,from,dmg,vy){
   if(bullets.length>60)return;
   const m=new THREE.Mesh(bulletGeo,bulletMatY);
   m.position.set(x,y,z);m.rotation.y=ang;scene.add(m);
   bullets.push({m,vx:Math.sin(ang)*1.6,vz:Math.cos(ang)*1.6,vy:vy||0,life:.55,from,dmg});
   gunSound();
+  if(from==='player')scarePeds(x,z,15);
 }
 
 // ---------- traffic (cars + bikes, with drivers/riders) ----------
