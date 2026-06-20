@@ -1292,6 +1292,28 @@ function boot(){
     pc.position.set(Lm.x+Lm.hw+3.5,0,Lm.z);pc.rotation.y=Math.PI/2;parked.push(pc);break;}
   buildTrees();
 }
+// ---------- cheat codes (just type the letters, classic GTA style) ----------
+let cheatBuf='';
+function spawnCheatVeh(v,msg){
+  v.position.set(player.x+Math.cos(player.heading)*4.5,0,player.z-Math.sin(player.heading)*4.5);
+  v.rotation.y=player.heading;if(!parked.includes(v))parked.push(v);chime();showMsg(msg);
+}
+const CHEATS={
+  TOOLED:()=>{['knife','pistol','uzi','shotgun'].forEach(giveWeapon);showMsg('🔫 FULLY ARMED');},
+  HEALTHY:()=>{playerHp=100;if(vehicle)vehicle.userData.hp=100;chime();showMsg('❤ FULL HEALTH');},
+  RICH:()=>{money+=50000;chime();showMsg('💰 +50,000');},
+  CLEAN:()=>{wanted=0;wantedTimer=0;updateStars();clearCops();showMsg('🚔 WANTED CLEARED');},
+  HOT:()=>{addWanted(5);showMsg('🔥 FIVE STARS');},
+  WHEELS:()=>spawnCheatVeh(makeCar(0xff2d2d,false,'race'),'🏎 RACER SPAWNED'),
+  CHOPPER:()=>spawnCheatVeh(makeHeli(0x111111),'🚁 CHOPPER SPAWNED'),
+  FLY:()=>spawnCheatVeh(makePlane(0xffffff),'✈ PLANE SPAWNED'),
+  BANG:()=>{const a=player.heading;explode({x:player.x+Math.sin(a)*6,z:player.z+Math.cos(a)*6});}
+};
+addEventListener('keydown',e=>{
+  if(!e.key||e.key.length!==1||!/[a-z]/i.test(e.key))return;
+  cheatBuf=(cheatBuf+e.key.toUpperCase()).slice(-12);
+  for(const code in CHEATS)if(cheatBuf.endsWith(code)){CHEATS[code]();cheatBuf='';break;}
+});
 // instance the collected tree spots from CC0 GLB trees (procedural fallback if models missing)
 function buildTrees(){
   const _q=new THREE.Quaternion(),_p=new THREE.Vector3(),_s=new THREE.Vector3(),_up=new THREE.Vector3(0,1,0),
