@@ -99,6 +99,7 @@ window.__probe=()=>{const st={parked:parked.length,ai:aiCars.length};
     st.airportCx=airport?+airport.cx.toFixed(0):null;st.airportCz=airport?+airport.cz.toFixed(0):null;
     st.raceCx=race?+race.cx.toFixed(0):null;st.raceCz=race?+race.cz.toFixed(0):null;st.raceWp=race&&race.wp?race.wp.length:0;
     st.raceActive=race.active;st.raceLap=race.lap||0;st.racePos=race.pos||0;st.racers=racers.length;
+    st.fps=+fpsEMA.toFixed(1);
     st.inCar=player.inCar;st.vehType=vehicle?vehicle.userData.type:null;st.inPlane=player.inCar&&vehicle&&vehicle.userData.type==='plane';
     st.px=+player.x.toFixed(2);st.pz=+player.z.toFixed(2);st.vehHp=vehicle?+vehicle.userData.hp.toFixed(1):null;
     st.vehSpd=vehicle&&vehicle.userData.spd!=null?+vehicle.userData.spd.toFixed(2):null;st.vy=+player.vy.toFixed(2);
@@ -1969,7 +1970,7 @@ function raceUpdate(dt,dtF){
   for(const r of racers)if(r.lap*race.wp.length+r.wpIdx>pScore)ahead++;
   race.pos=ahead+1;
   if(race.lap>=RACE_LAPS)endRace(race.pos);
-  else if(!player.inCar&&pdist(race.cx,race.cz)>150){showMsg('Race abandoned');endRace(null);}
+  else if(race.t>6&&!player.inCar&&pdist(race.cx,race.cz)>150){showMsg('Race abandoned');endRace(null);}   // grace period before abandon check
 }
 function taxiUpdate(dt,dtF){
   if(!taxi.active)return;
@@ -2385,7 +2386,7 @@ function zoneName(){
 
 // ---------- main loop ----------
 const clock=new THREE.Clock();
-let perf=0,frame=0,curZone='',fireT=0;
+let perf=0,frame=0,curZone='',fireT=0,fpsEMA=60;
 const skyDay=new THREE.Color(0x87ceeb),skyNight=new THREE.Color(0x0b1026),skySet=new THREE.Color(0xff8c5a);
 const skyTopDay=new THREE.Color(0x2f6fb0),skyTopNight=new THREE.Color(0x04060d);
 const skyCol=new THREE.Color(),skyTopCol=new THREE.Color(),_sunDir=new THREE.Vector3();
@@ -2394,7 +2395,7 @@ weaponHUD();
 function animate(){
   requestAnimationFrame(animate);
   const dt=Math.min(clock.getDelta(),.05),dtF=dt*60;
-  perf+=dt;frame++;
+  perf+=dt;frame++;if(dt>0)fpsEMA=fpsEMA*.93+(1/dt)*.07;   // smoothed FPS for the perf probe
   if(!started||bigOpen){renderFrame();return;}
   const k=inp();
   lightT+=dt;tod=(tod+dt/480)%1;
@@ -2678,13 +2679,15 @@ function animate(){
   for(let i=footCops.length-1;i>=0;i--)if(!footCopUpdate(footCops[i],dtF))footCops.splice(i,1);
 
   // --- world ---
-  for(const a of aiCars)aiUpdate(a,dtF);
-  for(const c of cows)cowUpdate(c,dtF);
-  for(const g of gangs)gangUpdate(g,dtF);
-  for(const cw of copWalkers)copWalkerUpdate(cw,dtF);
+  // LOD: skip per-frame AI for entities far from the player (they're tiny dots at distance) → keeps FPS up as the world fills
+  const CULL=240;
+  for(const a of aiCars)if(pdist(a.mesh.position.x,a.mesh.position.z)<CULL)aiUpdate(a,dtF);
+  for(const c of cows)if(pdist(c.mesh.position.x,c.mesh.position.z)<CULL)cowUpdate(c,dtF);
+  for(const g of gangs)if(g.state==='aggro'||pdist(g.x,g.z)<CULL)gangUpdate(g,dtF);   // aggro gangs always tick (combat)
+  for(const cw of copWalkers)if(pdist(cw.x,cw.z)<CULL)copWalkerUpdate(cw,dtF);
   dynUpdate(dtF);updateFlyHeads(dtF,dt);updateSkids(dt);
   if(river&&river.waterMat)river.waterMat.uniforms.uTime.value=perf; // flowing water animation
-  for(const p of peds)pedUpdate(p,dtF);
+  for(const p of peds)if(pdist(p.x,p.z)<CULL)pedUpdate(p,dtF);
   updateCrowd();
   const nsS=lightState('z');
   for(const t of tlights){
