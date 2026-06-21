@@ -100,6 +100,7 @@ window.__probe=()=>{const st={parked:parked.length,ai:aiCars.length};
     st.raceCx=race?+race.cx.toFixed(0):null;st.raceCz=race?+race.cz.toFixed(0):null;st.raceWp=race&&race.wp?race.wp.length:0;
     st.raceActive=race.active;st.raceLap=race.lap||0;st.racePos=race.pos||0;st.racers=racers.length;
     st.fps=+fpsEMA.toFixed(1);
+    st.courierActive=courier.active;st.courierDrops=courier.drops;st.courierTime=+courier.time.toFixed(1);
     st.inCar=player.inCar;st.vehType=vehicle?vehicle.userData.type:null;st.inPlane=player.inCar&&vehicle&&vehicle.userData.type==='plane';
     st.px=+player.x.toFixed(2);st.pz=+player.z.toFixed(2);st.vehHp=vehicle?+vehicle.userData.hp.toFixed(1):null;
     st.vehSpd=vehicle&&vehicle.userData.spd!=null?+vehicle.userData.spd.toFixed(2):null;st.vy=+player.vy.toFixed(2);
@@ -1356,7 +1357,8 @@ const CHEATS={
   BANG:()=>{const a=player.heading;explode({x:player.x+Math.sin(a)*6,z:player.z+Math.cos(a)*6});},
   VIGI:()=>startVigilante(),
   PEACE:()=>stopVigilante(),
-  RACE:()=>startRace()
+  RACE:()=>startRace(),
+  COURIER:()=>startCourier()
 };
 addEventListener('keydown',e=>{
   if(!e.key||e.key.length!==1||!/[a-z]/i.test(e.key))return;
@@ -1971,6 +1973,33 @@ function raceUpdate(dt,dtF){
   race.pos=ahead+1;
   if(race.lap>=RACE_LAPS)endRace(race.pos);
   else if(race.t>6&&!player.inCar&&pdist(race.cx,race.cz)>150){showMsg('Race abandoned');endRace(null);}   // grace period before abandon check
+}
+// ---------- courier mission: timed chain of package drop-offs for cash ----------
+const courier={active:false,drops:0,total:4,time:0,dest:null,marker:null};
+(function(){const g=new THREE.Group();
+  const ring=new THREE.Mesh(new THREE.CylinderGeometry(4,4,.8,24,1,true),new THREE.MeshBasicMaterial({color:0xffa022,transparent:true,opacity:.75,side:THREE.DoubleSide}));ring.position.y=.6;
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.1,70,12,1,true),new THREE.MeshBasicMaterial({color:0xffa022,transparent:true,opacity:.22,side:THREE.DoubleSide}));beam.position.y=35;
+  g.add(ring,beam);g.visible=false;scene.add(g);courier.marker=g;})();
+function courierDrop(){const it=pick(inters);courier.dest={x:it.x,z:it.z};courier.marker.position.set(it.x,0,it.z);courier.marker.visible=true;}
+function startCourier(){
+  if(courier.active)return;
+  courier.active=true;courier.drops=0;courier.total=4;courier.time=50;courierDrop();chime();
+  showMsg('📦 COURIER — '+courier.total+' drops, beat the clock!');
+}
+function endCourier(ok){
+  courier.active=false;courier.marker.visible=false;
+  if(ok){const prize=2000+courier.drops*800;money+=prize;chime();showMsg('📦 All delivered! +'+prize);}
+  else showMsg('📦 Out of time — delivery failed');
+}
+function courierUpdate(dt){
+  if(!courier.active)return;
+  courier.time-=dt;courier.marker.rotation.y+=dt*1.5;
+  if(courier.time<=0){endCourier(false);return;}
+  if(courier.dest&&pdist(courier.dest.x,courier.dest.z)<6){
+    courier.drops++;
+    if(courier.drops>=courier.total)endCourier(true);
+    else{courier.time+=12;courierDrop();chime();showMsg('Drop '+courier.drops+'/'+courier.total+' ✓  (+12s)');}
+  }
 }
 function taxiUpdate(dt,dtF){
   if(!taxi.active)return;
@@ -2723,7 +2752,7 @@ function animate(){
   if(race.marker&&!race.active){race.marker.rotation.y+=dt*1.5;race.marker.children[0].position.y=.6+Math.sin(perf*3)*.3;}
   if(!dead){
     if(!race.active&&player.inCar&&vehicle&&vehicle.userData.type==='car'&&pdist(race.wp[0].x,race.wp[0].z)<6)startRace();   // drive into the start ring
-    raceUpdate(dt,dtF);
+    raceUpdate(dt,dtF);courierUpdate(dt);
   }
 
   // --- day/night (smooth) ---
@@ -2852,7 +2881,7 @@ function animate(){
     document.getElementById('money').textContent='$'+money;
     const hrs=Math.floor(tod*24),min=Math.floor((tod*24%1)*60);
     document.getElementById('clock').textContent=String(hrs).padStart(2,'0')+':'+String(min).padStart(2,'0');
-    document.getElementById('obj').textContent=race.active?('🏁 LAP '+Math.min(race.lap+1,RACE_LAPS)+'/'+RACE_LAPS+' · P'+(race.pos||1)+'/'+(racers.length+1)):vigil.active?('🎯 VIGILANTE  '+vigil.kills+'/'+vigil.goal):taxi.active?
+    document.getElementById('obj').textContent=race.active?('🏁 LAP '+Math.min(race.lap+1,RACE_LAPS)+'/'+RACE_LAPS+' · P'+(race.pos||1)+'/'+(racers.length+1)):courier.active?('📦 COURIER · '+courier.drops+'/'+courier.total+' · '+Math.ceil(courier.time)+'s'):vigil.active?('🎯 VIGILANTE  '+vigil.kills+'/'+vigil.goal):taxi.active?
       (taxi.phase==='ride'?'TAXI · '+Math.round(Math.hypot(player.x-taxi.dest.x,player.z-taxi.dest.z))+'m to drop-off':
        taxi.phase==='toCar'?'TAXI · passenger boarding…':'TAXI · fare in progress')
       :((vehicle&&vehicle.userData.taxi)?'Press 1 to start a taxi fare':'');
