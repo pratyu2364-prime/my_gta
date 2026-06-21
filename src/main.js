@@ -75,7 +75,7 @@ window.__probe=()=>{const st={parked:parked.length,ai:aiCars.length};
     st.inCar=player.inCar;st.vehType=vehicle?vehicle.userData.type:null;st.inPlane=player.inCar&&vehicle&&vehicle.userData.type==='plane';
     st.charInScene=char.parent===scene;st.charVis=char.visible;st.jack=jack?jack.phase:null;st.jackT=jack?+jack.t.toFixed(2):null;st.exitCool=+exitCool.toFixed(2);
     if(river){st.riverX0=+river.x0.toFixed(0);st.riverX1=+river.x1.toFixed(0);}
-    st.settings={volume:settings.volume,sensitivity:settings.sensitivity,invertY:settings.invertY,quality:settings.quality};st.hasSave=hasSave(); // TEMP diag
+    st.settings={volume:settings.volume,sensitivity:settings.sensitivity,invertY:settings.invertY,quality:settings.quality};st.hasSave=hasSave();st.paused=paused; // TEMP diag
     st.px=+player.x.toFixed(2);st.pz=+player.z.toFixed(2);st.vehHp=vehicle?+vehicle.userData.hp.toFixed(1):null;
     st.vehSpd=vehicle&&vehicle.userData.spd!=null?+vehicle.userData.spd.toFixed(2):null;st.vy=+player.vy.toFixed(2);
     const _wd=new THREE.Vector3();camera.getWorldDirection(_wd);st.camY=+camera.position.y.toFixed(2);st.camDirY=+_wd.y.toFixed(3);st.camPitch=+camPitch.toFixed(3);}catch(e){st.probeErr=e.message;}
@@ -2436,6 +2436,21 @@ function zoneName(){
 // ---------- main loop ----------
 const clock=new THREE.Clock();
 let perf=0,frame=0,curZone='',fireT=0,fpsEMA=60;
+// ---------- pause ----------
+let paused=false;
+function setPaused(v){
+  paused=v;document.getElementById('pause').style.display=v?'flex':'none';
+  if(v){if(document.exitPointerLock)document.exitPointerLock();}
+  else{clock.getDelta();const c=document.getElementById('c');if(c.requestPointerLock)c.requestPointerLock();}   // discard the long paused delta so the sim doesn't jump
+}
+document.addEventListener('pointerlockchange',()=>{
+  if(!document.pointerLockElement&&started&&!bigOpen&&!paused&&!dead)setPaused(true);   // Esc / focus loss → pause
+});
+if(DEBUG)window.__pause=v=>setPaused(v);   // test hook (headless never acquires pointer lock)
+{const $=id=>document.getElementById(id);
+ $('pResume').addEventListener('click',()=>setPaused(false));
+ $('pSettings').addEventListener('click',()=>{$('pause').style.display='none';window.__openSettings('pause');});
+ $('pQuit').addEventListener('click',()=>{paused=false;$('pause').style.display='none';started=false;$('intro').style.display='flex';if(hasSave())$('mContinue').disabled=false;});}
 const skyDay=new THREE.Color(0x87ceeb),skyNight=new THREE.Color(0x0b1026),skySet=new THREE.Color(0xff8c5a);
 const skyTopDay=new THREE.Color(0x2f6fb0),skyTopNight=new THREE.Color(0x04060d);
 const skyCol=new THREE.Color(),skyTopCol=new THREE.Color(),_sunDir=new THREE.Vector3();
@@ -2445,7 +2460,7 @@ function animate(){
   requestAnimationFrame(animate);
   const dt=Math.min(clock.getDelta(),.05),dtF=dt*60;
   perf+=dt;frame++;if(dt>0)fpsEMA=fpsEMA*.93+(1/dt)*.07;   // smoothed FPS for the perf probe
-  if(!started||bigOpen){renderFrame();return;}
+  if(!started||bigOpen||paused){renderFrame();return;}
   const k=inp();
   lightT+=dt;tod=(tod+dt/480)%1;
 
