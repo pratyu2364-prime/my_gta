@@ -117,7 +117,7 @@ if(EffectComposer&&UnrealBloomPass&&RenderPass&&ShaderPass)try{
   bloomPass=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),.55,.6,.82); // strength, radius, threshold
   composer.addPass(bloomPass);
   const GradeShader={
-    uniforms:{tDiffuse:{value:null},sat:{value:.93},con:{value:1.09},vig:{value:.42}},
+    uniforms:{tDiffuse:{value:null},sat:{value:1.08},con:{value:1.13},vig:{value:.46}},
     vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
     fragmentShader:'varying vec2 vUv;uniform sampler2D tDiffuse;uniform float sat,con,vig;'
       +'void main(){vec3 c=texture2D(tDiffuse,vUv).rgb;'
