@@ -11,6 +11,7 @@ import { WORLD, ROAD_W, SIDE, HALF, LANE } from './core/constants.js';
 import { M, rnd, pick } from './core/math.js';
 import { buildRoadNetwork } from './world/roads.js';
 import { loadSettings, saveSettings, SETTINGS_DEFAULTS } from './core/settings.js';
+import { hasSave, loadProgress, saveProgress } from './core/save.js';
 
 function showError(m){document.getElementById('err').style.display='flex';document.getElementById('errmsg').textContent=m;}
 try{main();}catch(e){showError(e.message+'\n'+(e.stack||''));}
@@ -21,6 +22,8 @@ function main(){
 // world constants (core/constants.js), math helpers (core/math.js) and the
 // road network (world/roads.js) are now imported at module top.
 const { cityX, cityZ, midX, midZ, inters, spawnX, spawnZ } = buildRoadNetwork();
+const DEBUG=location.hostname==='localhost'||location.hostname==='127.0.0.1'||location.search.includes('debug');
+let saveSig='';   // last persisted progression signature — only write when it actually changes (debounce can't flush if called every frame)
 
 // ---------- renderer / scene ----------
 const scene=new THREE.Scene();
@@ -72,7 +75,7 @@ window.__probe=()=>{const st={parked:parked.length,ai:aiCars.length};
     st.inCar=player.inCar;st.vehType=vehicle?vehicle.userData.type:null;st.inPlane=player.inCar&&vehicle&&vehicle.userData.type==='plane';
     st.charInScene=char.parent===scene;st.charVis=char.visible;st.jack=jack?jack.phase:null;st.jackT=jack?+jack.t.toFixed(2):null;st.exitCool=+exitCool.toFixed(2);
     if(river){st.riverX0=+river.x0.toFixed(0);st.riverX1=+river.x1.toFixed(0);}
-    st.settings={volume:settings.volume,sensitivity:settings.sensitivity,invertY:settings.invertY,quality:settings.quality}; // TEMP diag
+    st.settings={volume:settings.volume,sensitivity:settings.sensitivity,invertY:settings.invertY,quality:settings.quality};st.hasSave=hasSave(); // TEMP diag
     st.px=+player.x.toFixed(2);st.pz=+player.z.toFixed(2);st.vehHp=vehicle?+vehicle.userData.hp.toFixed(1):null;
     st.vehSpd=vehicle&&vehicle.userData.spd!=null?+vehicle.userData.spd.toFixed(2):null;st.vy=+player.vy.toFixed(2);
     const _wd=new THREE.Vector3();camera.getWorldDirection(_wd);st.camY=+camera.position.y.toFixed(2);st.camDirY=+_wd.y.toFixed(3);st.camPitch=+camPitch.toFixed(3);}catch(e){st.probeErr=e.message;}
@@ -83,7 +86,9 @@ window.__hdg=()=>+player.heading.toFixed(3); // TEMP
 let assetsReady=false;
 function markReady(){
   if(assetsReady)return;assetsReady=true;
-  const p=document.querySelector('#intro p');if(p)p.textContent='CLICK OR PRESS ANY KEY TO START';
+  const n=document.getElementById('mNew');if(n)n.disabled=false;
+  const c=document.getElementById('mContinue');if(c&&hasSave())c.disabled=false;
+  const l=document.getElementById('loadlbl');if(l)l.style.display='none';
 }
 {const p=document.querySelector('#intro p');if(p)p.textContent='LOADING WORLD…';}
 let booted=false;
@@ -1174,7 +1179,7 @@ function findNearestPed(r){let best=null,bd=r;for(const p of peds){if(p.state===
   const d=pdist(p.x,p.z);if(d<bd){bd=d;best=p;}}return best;}
 addEventListener('keydown',e=>{
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
-  keys[e.code]=true;start();
+  keys[e.code]=true;
   if(e.code==='KeyM')toggleMap();
   if(e.code==='KeyQ')cycleWeapon();
   if(e.code==='KeyE')pressedE=true;
@@ -1215,12 +1220,19 @@ applySettings(settings);
   window.__openSettings=from=>{sync();$('settings').dataset.from=from;$('settings').style.display='flex';};
   $('setBack').addEventListener('click',()=>{$('settings').style.display='none';const f=$('settings').dataset.from;if(f==='menu')$('intro').style.display='flex';else if(f==='pause')$('pause').style.display='flex';});
   $('mSettings').addEventListener('click',()=>{$('intro').style.display='none';window.__openSettings('menu');});
+  $('mNew').addEventListener('click',()=>start(false));
+  $('mContinue').addEventListener('click',()=>start(true));
+  $('mNew').disabled=!assetsReady;   // gate start on world/asset readiness (markReady enables)
+  if(assetsReady){if(hasSave())$('mContinue').disabled=false;const l=$('loadlbl');if(l)l.style.display='none';}
 }
-addEventListener('mousedown',()=>{if(started&&!bigOpen)firing=true;start();});
+addEventListener('mousedown',()=>{if(started&&!bigOpen)firing=true;});
 addEventListener('mouseup',()=>firing=false);
-function start(){if(started||!assetsReady)return;started=true;initAudio();document.getElementById('intro').style.display='none';
+function start(continueSave){if(started||!assetsReady)return;started=true;initAudio();
+  if(continueSave){const sv=loadProgress();if(sv){money=sv.money;owned.length=0;for(const w of sv.owned)owned.push(w);for(const k in sv.ammo)ammo[k]=sv.ammo[k];curW=0;weaponHUD();}}
+  document.getElementById('intro').style.display='none';
   // grab pointer lock on start so the mouse gives unbounded 360° look (first click hits #intro, not the canvas)
   if(canvasEl.requestPointerLock)canvasEl.requestPointerLock();}
+if(DEBUG)window.__start=c=>start(!!c);   // test entry (menu-bypass); prod boots only via menu buttons
 const inp=()=>({
   up:keys.KeyW||keys.ArrowUp, dn:keys.KeyS||keys.ArrowDown,
   lf:keys.KeyA||keys.ArrowLeft, rt:keys.KeyD||keys.ArrowRight,
@@ -2441,6 +2453,7 @@ function animate(){
   if(!dead){
     if(player.inCar&&(!vehicle||vehicle.userData.dead)){player.inCar=false;vehicle=null;}   // orphaned in-car flag → drop back to on foot
     if(!player.inCar&&!jack&&char.parent!==scene){scene.add(char);char.scale.setScalar(1);char.visible=true;}   // hard safety: on foot the avatar is ALWAYS in the scene & visible
+    {const sig=money+'|'+owned.join(',')+'|'+JSON.stringify(ammo);if(sig!==saveSig){saveSig=sig;saveProgress({money,owned:owned.slice(),ammo:Object.assign({},ammo)});}}   // progression auto-save: only on change (debounced ~1s in core/save.js)
     if(player.inCar&&vehicle&&vehicle.userData.type==='plane'){
       planeUpdate(k,dt,dtF);
     }else if(player.inCar&&vehicle&&vehicle.userData.type==='heli'){
