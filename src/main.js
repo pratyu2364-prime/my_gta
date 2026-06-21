@@ -1230,6 +1230,7 @@ addEventListener('mouseup',()=>firing=false);
 function start(continueSave){if(started||!assetsReady)return;started=true;initAudio();
   if(continueSave){const sv=loadProgress();if(sv){money=sv.money;owned.length=0;for(const w of sv.owned)owned.push(w);for(const k in sv.ammo)ammo[k]=sv.ammo[k];curW=0;weaponHUD();}}
   document.getElementById('intro').style.display='none';
+  showMsg(continueSave?'Welcome back to Gully Run':'Welcome to Gully Run — steal a car (E) and explore!');
   // grab pointer lock on start so the mouse gives unbounded 360° look (first click hits #intro, not the canvas)
   if(canvasEl.requestPointerLock)canvasEl.requestPointerLock();}
 if(DEBUG)window.__start=c=>start(!!c);   // test entry (menu-bypass); prod boots only via menu buttons
@@ -2065,6 +2066,12 @@ function taxiUpdate(dt,dtF){
 function showMsg(t){
   const el=document.getElementById('msg');el.textContent=t;el.style.opacity=1;
   clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity=0,3200);
+}
+// onboarding: when no mission is running, the objective line always tells a new player what to do next
+function onboardHint(){
+  if(!player.inCar)return '🚗 Walk up to a car and press E to drive';
+  const d=Math.round(pdist(race.cx,race.cz));
+  return '🏁 Drive to the white ring ('+d+'m) to race — or type a cheat: VIGI · COURIER · TOOLED';
 }
 
 // ---------- death / arrest ----------
@@ -2948,7 +2955,7 @@ function animate(){
     document.getElementById('obj').textContent=race.active?('🏁 LAP '+Math.min(race.lap+1,RACE_LAPS)+'/'+RACE_LAPS+' · P'+(race.pos||1)+'/'+(racers.length+1)):courier.active?('📦 COURIER · '+courier.drops+'/'+courier.total+' · '+Math.ceil(courier.time)+'s'):vigil.active?('🎯 VIGILANTE  '+vigil.kills+'/'+vigil.goal):taxi.active?
       (taxi.phase==='ride'?'TAXI · '+Math.round(Math.hypot(player.x-taxi.dest.x,player.z-taxi.dest.z))+'m to drop-off':
        taxi.phase==='toCar'?'TAXI · passenger boarding…':'TAXI · fare in progress')
-      :((vehicle&&vehicle.userData.taxi)?'Press 1 to start a taxi fare':'');
+      :((vehicle&&vehicle.userData.taxi)?'Press 1 to start a taxi fare':onboardHint());
     drawMinimap();
   }
   if(vigO>.012){document.getElementById('vig').style.opacity=vigO;vigO*=Math.pow(.92,dtF);}
