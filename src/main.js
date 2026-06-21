@@ -102,6 +102,8 @@ window.__probe=()=>{const st={parked:parked.length,ai:aiCars.length};
     st.fps=+fpsEMA.toFixed(1);
     st.courierActive=courier.active;st.courierDrops=courier.drops;st.courierTime=+courier.time.toFixed(1);
     st.inCar=player.inCar;st.vehType=vehicle?vehicle.userData.type:null;st.inPlane=player.inCar&&vehicle&&vehicle.userData.type==='plane';
+    st.charInScene=char.parent===scene;st.charVis=char.visible;st.jack=jack?jack.phase:null;st.jackT=jack?+jack.t.toFixed(2):null;st.exitCool=+exitCool.toFixed(2);
+    if(river){st.riverX0=+river.x0.toFixed(0);st.riverX1=+river.x1.toFixed(0);} // TEMP diag
     st.px=+player.x.toFixed(2);st.pz=+player.z.toFixed(2);st.vehHp=vehicle?+vehicle.userData.hp.toFixed(1):null;
     st.vehSpd=vehicle&&vehicle.userData.spd!=null?+vehicle.userData.spd.toFixed(2):null;st.vy=+player.vy.toFixed(2);
     const _wd=new THREE.Vector3();camera.getWorldDirection(_wd);st.camY=+camera.position.y.toFixed(2);st.camDirY=+_wd.y.toFixed(3);st.camPitch=+camPitch.toFixed(3);}catch(e){st.probeErr=e.message;}
@@ -428,7 +430,7 @@ const airport={};
 }
 
 // ---------- F1-style race circuit (data + visuals + marker; race logic added separately) ----------
-const race={cx:(spawnX>0?1:-1)*(WORLD-150),cz:(spawnZ>0?1:-1)*(WORLD-150),rx:72,rz:56,active:false,marker:null};
+const race={cx:(river?(river.cx>0?-1:1):(spawnX>0?1:-1))*(WORLD-150),cz:(spawnZ>0?1:-1)*(WORLD-150),rx:72,rz:56,active:false,marker:null};   // sit the circuit on the bank OPPOSITE the river so the track never lands on water
 race.x0=race.cx-92;race.x1=race.cx+92;race.z0=race.cz-78;race.z1=race.cz+78;
 // reserve the circuit footprint so no buildings spawn on the track (same trick as the airport)
 for(const b of blocks)if(!b.special&&!b.river&&b.x1>race.x0-6&&b.x0<race.x1+6&&b.z1>race.z0-6&&b.z0<race.z1+6){b.special=true;b.race=true;}
@@ -2155,8 +2157,11 @@ function finishJack(){
   player.heading=near.rotation.y;player.vx=player.vz=0;player.vy=0;player.climbV=0;player.y=near.position.y||0;player.airborne=false;
   mountChar(near);exitCool=.6;jack=null;
 }
+function abortJack(){if(jack&&jack.ai)jack.ai.jacked=false;jack=null;if(char.parent!==scene){scene.add(char);char.scale.setScalar(1);}char.visible=true;}
 function jackUpdate(dt,dtF){
   const v=jack.veh,bike=v.userData.type==='bike';
+  if(!v||v.userData.dead){abortJack();return;}                 // target gone/destroyed → release control
+  jack.life=(jack.life||0)+dt;if(jack.life>8){abortJack();return;}   // watchdog: never leave the player frozen mid-jack
   const dp=v.localToWorld(new THREE.Vector3(bike?-1.0:-1.8,0,bike?.1:.9));
   if(jack.phase==='walk'){
     const dx=dp.x-player.x,dz=dp.z-player.z,d=Math.hypot(dx,dz);
@@ -2208,9 +2213,12 @@ function handleEnterExit(dtF){
   exitCool=Math.max(0,exitCool-dtF/60);
   const prompt=document.getElementById('prompt');
   if(player.inCar){
-    if(Math.hypot(player.vx,player.vz)<.15){prompt.innerHTML='Press <b>E</b> to get out';prompt.style.opacity=1;}
+    const aircraft=vehicle&&(vehicle.userData.type==='heli'||vehicle.userData.type==='plane');
+    const airborne=aircraft&&player.y>2.5;   // can't step out of a flying aircraft — land first
+    if(airborne){prompt.innerHTML='Land before exiting';prompt.style.opacity=1;}
+    else if(Math.hypot(player.vx,player.vz)<.15){prompt.innerHTML='Press <b>E</b> to get out';prompt.style.opacity=1;}
     else prompt.style.opacity=0;
-    if(pressedE&&exitCool<=0&&Math.hypot(player.vx,player.vz)<.3){
+    if(pressedE&&exitCool<=0&&!airborne&&Math.hypot(player.vx,player.vz)<.3){
       exitCool=.6;player.inCar=false;
       const fx=Math.sin(player.heading),fz=Math.cos(player.heading);
       const veh=vehicle;
@@ -2294,8 +2302,8 @@ function heliUpdate(k,dt,dtF){
   const nfx=Math.sin(player.heading),nfz=Math.cos(player.heading);
   player.vx=nfx*ud.spd;player.vz=nfz*ud.spd;
   let nx=v.position.x+player.vx*dtF,nz=v.position.z+player.vz*dtF;
-  // only collide with buildings in the mid-air band — on the ground / low takeoff the chopper maneuvers freely (no ground-collision fighting its controls)
-  if(player.y>6&&player.y<26){const pp={x:nx,z:nz,vx:player.vx,vz:player.vz};const imp=resolveCircle(pp,ud.rad);
+  // chopper flies freely above rooftops — only bump buildings while taxiing very low (<4u); otherwise no air collision
+  if(player.y<4){const pp={x:nx,z:nz,vx:player.vx,vz:player.vz};const imp=resolveCircle(pp,ud.rad);
     nx=pp.x;nz=pp.z;if(imp>.4){ud.spd*=.5;damageVehicle(imp*16);crashSound(imp);}}
   nx=M.clamp(nx,-WORLD+6,WORLD-6);nz=M.clamp(nz,-WORLD+6,WORLD-6);
   v.position.set(nx,player.y,nz);player.x=nx;player.z=nz;
@@ -2435,6 +2443,8 @@ function animate(){
 
   // --- player ---
   if(!dead){
+    if(player.inCar&&(!vehicle||vehicle.userData.dead)){player.inCar=false;vehicle=null;}   // orphaned in-car flag → drop back to on foot
+    if(!player.inCar&&!jack&&char.parent!==scene){scene.add(char);char.scale.setScalar(1);char.visible=true;}   // hard safety: on foot the avatar is ALWAYS in the scene & visible
     if(player.inCar&&vehicle&&vehicle.userData.type==='plane'){
       planeUpdate(k,dt,dtF);
     }else if(player.inCar&&vehicle&&vehicle.userData.type==='heli'){
@@ -2521,6 +2531,26 @@ function animate(){
           if(rel>.4){damageVehicle(rel*9);crashSound(rel*.7);sparks(vehicle.position);addShake(Math.min(.8,rel*.6));
             if(crimeCool<=0){addWanted(1);crimeCool=4;}}
         }
+      }
+      // shunt pursuit police cruisers too (cops[] aren't in aiCars)
+      for(const c of cops){
+        if(!c.mesh||c.mesh.userData.dead)continue;
+        const rr=rad+c.mesh.userData.rad;
+        const dx=pp.x-c.mesh.position.x,dz=pp.z-c.mesh.position.z,d=Math.hypot(dx,dz);
+        if(d<rr){
+          const nx=dx/(d||1),nz=dz/(d||1),rel=Math.hypot(player.vx,player.vz);
+          vehicle.position.x+=nx*(rr-d)*.6;vehicle.position.z+=nz*(rr-d)*.6;
+          c.mesh.position.x-=nx*(rr-d)*.4;c.mesh.position.z-=nz*(rr-d)*.4;
+          player.vx*=.92;player.vz*=.92;
+          if(rel>.4){damageVehicle(rel*9);crashSound(rel*.7);sparks(vehicle.position);addShake(Math.min(.8,rel*.6));addWanted(1);}
+        }
+      }
+      // run down foot police while driving (mirrors the bullet-kill logic)
+      if(spd>.3&&!player.airborne){
+        for(let ci=copWalkers.length-1;ci>=0;ci--){const cw=copWalkers[ci];
+          if(Math.hypot(cw.x-pp.x,cw.z-pp.z)<rad+.8){spawnBlood({x:cw.x,z:cw.z});scene.remove(cw.mesh);copWalkers.splice(ci,1);addWanted(2);crashSound(.3);}}
+        for(let fi=footCops.length-1;fi>=0;fi--){const f=footCops[fi];
+          if(Math.hypot(f.mesh.position.x-pp.x,f.mesh.position.z-pp.z)<rad+.8){spawnBlood(f.mesh.position);scene.remove(f.mesh);footCops.splice(fi,1);addWanted(2);crashSound(.3);}}
       }
       // smash through dynamic props
       for(const pr of dynProps){if(pr.dead)continue;
