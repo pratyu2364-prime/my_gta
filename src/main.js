@@ -7,52 +7,19 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { AssetManager } from './core/assets.js';
+import { WORLD, ROAD_W, SIDE, HALF, LANE } from './core/constants.js';
+import { M, rnd, pick } from './core/math.js';
+import { buildRoadNetwork } from './world/roads.js';
 
 function showError(m){document.getElementById('err').style.display='flex';document.getElementById('errmsg').textContent=m;}
 try{main();}catch(e){showError(e.message+'\n'+(e.stack||''));}
 
 function main(){
 'use strict';
-const M=THREE.MathUtils;
-const rnd=(a,b)=>a+Math.random()*(b-a), pick=a=>a[Math.floor(Math.random()*a.length)];
 
-// ---------- world constants ----------
-const WORLD=450;
-const ROAD_W=14, SIDE=3, HALF=ROAD_W/2+SIDE;
-const LANE=3.4;
-
-// ---------- asymmetric road network ----------
-// lines are objects {c:coordinate, a:start, b:end, cross:[lines]} — some roads are partial (dead ends)
-function genAxis(){
-  const l=[];let c=-WORLD+rnd(40,80);
-  while(c<WORLD-100){l.push({c,a:-WORLD+10,b:WORLD-10,cross:[]});c+=rnd(55,150);}
-  return l;
-}
-const cityX=genAxis(), cityZ=genAxis();
-const midX=Math.floor(cityX.length/2), midZ=Math.floor(cityZ.length/2);
-function trimAxis(axis,other,skip){
-  for(let i=0;i<axis.length;i++){
-    if(i===skip||Math.random()>=.34)continue;
-    const cs=other.map(o=>o.c);
-    let i0=Math.floor(Math.random()*(cs.length-2));
-    let i1=i0+2+Math.floor(Math.random()*(cs.length-i0-2));
-    if(i1>=cs.length)i1=cs.length-1;
-    if(cs[i1]-cs[i0]<140)continue;
-    if(Math.random()<.5)axis[i].a=cs[i0];else axis[i].b=cs[i1];
-    if(Math.random()<.3){axis[i].a=cs[i0];axis[i].b=cs[i1];}
-  }
-}
-trimAxis(cityX,cityZ,midX);trimAxis(cityZ,cityX,midZ);
-function computeCross(){
-  for(const L of cityX)L.cross=cityZ.filter(W=>W.c>=L.a-1&&W.c<=L.b+1&&L.c>=W.a-1&&L.c<=W.b+1);
-  for(const W of cityZ)W.cross=cityX.filter(L=>L.c>=W.a-1&&L.c<=W.b+1&&W.c>=L.a-1&&W.c<=L.b+1);
-}
-computeCross();
-for(const L of cityX.concat(cityZ))if(L.cross.length<2){L.a=-WORLD+10;L.b=WORLD-10;}
-computeCross();
-const inters=[];
-for(const L of cityX)for(const W of L.cross)inters.push({x:L.c,z:W.c});
-const spawnX=cityX[midX].c, spawnZ=cityZ[midZ].c;
+// world constants (core/constants.js), math helpers (core/math.js) and the
+// road network (world/roads.js) are now imported at module top.
+const { cityX, cityZ, midX, midZ, inters, spawnX, spawnZ } = buildRoadNetwork();
 
 // ---------- renderer / scene ----------
 const scene=new THREE.Scene();
