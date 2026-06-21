@@ -48,6 +48,18 @@
   #bubble:after{content:'';position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);border:8px solid transparent;border-top-color:#1a2330}
   #minimap{box-shadow:0 4px 18px rgba(0,0,0,.6),inset 0 0 30px rgba(0,0,0,.5)}
   #hpwrap{box-shadow:0 2px 6px rgba(0,0,0,.5)}
+  .menu{display:flex;flex-direction:column;gap:12px;margin:6px 0 18px}
+  .mbtn{pointer-events:auto;cursor:pointer;font:900 18px 'Russo One',Arial;letter-spacing:1px;color:#1a2330;background:#ffd23e;border:none;border-radius:8px;padding:12px 40px;box-shadow:0 3px 0 #b3531a;transition:transform .08s}
+  .mbtn:hover{transform:translateY(-2px)}
+  .mbtn:disabled{opacity:.4;cursor:default;box-shadow:0 3px 0 #555;background:#caa}
+  .howto summary{cursor:pointer;color:#9fb6d8;font:700 14px Arial;pointer-events:auto}
+  .ovl{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(5,8,14,.82)}
+  #pause{z-index:45}#settings{z-index:55}
+  .panel{display:flex;flex-direction:column;gap:14px;align-items:stretch;background:#11192a;border:2px solid #2a3a55;border-radius:14px;padding:28px 34px;min-width:300px;color:#cfd8e6}
+  .panel h3{margin:0 0 6px;text-align:center;font:900 26px 'Russo One',Arial;color:#ffd23e}
+  .panel label{display:flex;justify-content:space-between;align-items:center;gap:14px;font:600 14px Arial;pointer-events:auto}
+  .panel input[type=range]{pointer-events:auto}.panel .chk{justify-content:flex-start;gap:8px}
+  .panel select{pointer-events:auto}
 </style>
 </head>
 <body>
@@ -56,20 +68,40 @@
 <div id="intro">
   <h1>GRAND THIEF AUXTO</h1>
   <h2>Bharat Version &nbsp;•&nbsp; an open world crime sandbox</h2>
-  <table>
-    <tr><td>W A S D</td><td>drive / walk (camera-relative on foot)</td></tr>
-    <tr><td>MOUSE</td><td>look around &amp; aim — steers you on foot (click to lock)</td></tr>
-    <tr><td>SPACE</td><td>handbrake (drift!)</td></tr>
-    <tr><td>SHIFT</td><td>boost / sprint</td></tr>
-    <tr><td>E</td><td>enter / exit & steal cars, bikes and autos</td></tr>
-    <tr><td>T</td><td>talk to nearby people</td></tr>
-    <tr><td>CLICK / F</td><td>shoot (find gun pickups around the city)</td></tr>
-    <tr><td>Q</td><td>switch weapon</td></tr>
-    <tr><td>H</td><td>horn</td></tr>
-    <tr><td>M</td><td>city map</td></tr>
-  </table>
-  <p>CLICK OR PRESS ANY KEY TO START</p>
+  <div class="menu">
+    <button id="mNew" class="mbtn">NEW GAME</button>
+    <button id="mContinue" class="mbtn" disabled>CONTINUE</button>
+    <button id="mSettings" class="mbtn">SETTINGS</button>
+  </div>
+  <details class="howto"><summary>How to play</summary>
+    <table>
+      <tr><td>W A S D</td><td>drive / walk (camera-relative on foot)</td></tr>
+      <tr><td>MOUSE</td><td>look around &amp; aim — steers you on foot (click to lock)</td></tr>
+      <tr><td>SPACE</td><td>handbrake (drift!)</td></tr>
+      <tr><td>SHIFT</td><td>boost / sprint</td></tr>
+      <tr><td>E</td><td>enter / exit &amp; steal cars, bikes and autos</td></tr>
+      <tr><td>T</td><td>talk to nearby people</td></tr>
+      <tr><td>CLICK / F</td><td>shoot (find gun pickups around the city)</td></tr>
+      <tr><td>Q</td><td>switch weapon</td></tr>
+      <tr><td>H</td><td>horn</td></tr>
+      <tr><td>M</td><td>city map &nbsp;•&nbsp; ESC pause</td></tr>
+    </table>
+  </details>
 </div>
+<div id="pause" class="ovl"><div class="panel">
+  <h3>PAUSED</h3>
+  <button id="pResume" class="mbtn">RESUME</button>
+  <button id="pSettings" class="mbtn">SETTINGS</button>
+  <button id="pQuit" class="mbtn">QUIT TO MENU</button>
+</div></div>
+<div id="settings" class="ovl"><div class="panel">
+  <h3>SETTINGS</h3>
+  <label>Volume <input id="setVol" type="range" min="0" max="1" step="0.05"></label>
+  <label>Mouse sensitivity <input id="setSens" type="range" min="0.3" max="2" step="0.05"></label>
+  <label class="chk"><input id="setInvert" type="checkbox"> Invert Y</label>
+  <label>Graphics <select id="setQuality"><option value="low">Low</option><option value="med">Medium</option><option value="high">High</option></select></label>
+  <button id="setBack" class="mbtn">BACK</button>
+</div></div>
 <div class="hud" id="stats">
   <div id="money">$500</div>
   <div id="clock">08:00</div>
