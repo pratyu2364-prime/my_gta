@@ -1,0 +1,12 @@
+# ruflo / claude-flow local state (not part of the game)
+.claude-flow/
+.claude/
+.swarm/
+agentdb.rvf
+agentdb.rvf.lock
+ruvector.db
+
+# OS / editor
+.DS_Store
+*.log
+node_modules/
