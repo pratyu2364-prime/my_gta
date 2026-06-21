@@ -10,3 +10,7 @@ ruvector.db
 .DS_Store
 *.log
 node_modules/
+
+# build artifacts
+dist/
+dist-electron/
