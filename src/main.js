@@ -10,6 +10,7 @@ import { AssetManager } from './core/assets.js';
 import { WORLD, ROAD_W, SIDE, HALF, LANE } from './core/constants.js';
 import { M, rnd, pick } from './core/math.js';
 import { buildRoadNetwork } from './world/roads.js';
+import { loadSettings, saveSettings, SETTINGS_DEFAULTS } from './core/settings.js';
 
 function showError(m){document.getElementById('err').style.display='flex';document.getElementById('errmsg').textContent=m;}
 try{main();}catch(e){showError(e.message+'\n'+(e.stack||''));}
@@ -70,7 +71,8 @@ window.__probe=()=>{const st={parked:parked.length,ai:aiCars.length};
     st.courierActive=courier.active;st.courierDrops=courier.drops;st.courierTime=+courier.time.toFixed(1);
     st.inCar=player.inCar;st.vehType=vehicle?vehicle.userData.type:null;st.inPlane=player.inCar&&vehicle&&vehicle.userData.type==='plane';
     st.charInScene=char.parent===scene;st.charVis=char.visible;st.jack=jack?jack.phase:null;st.jackT=jack?+jack.t.toFixed(2):null;st.exitCool=+exitCool.toFixed(2);
-    if(river){st.riverX0=+river.x0.toFixed(0);st.riverX1=+river.x1.toFixed(0);} // TEMP diag
+    if(river){st.riverX0=+river.x0.toFixed(0);st.riverX1=+river.x1.toFixed(0);}
+    st.settings={volume:settings.volume,sensitivity:settings.sensitivity,invertY:settings.invertY,quality:settings.quality}; // TEMP diag
     st.px=+player.x.toFixed(2);st.pz=+player.z.toFixed(2);st.vehHp=vehicle?+vehicle.userData.hp.toFixed(1):null;
     st.vehSpd=vehicle&&vehicle.userData.spd!=null?+vehicle.userData.spd.toFixed(2):null;st.vy=+player.vy.toFixed(2);
     const _wd=new THREE.Vector3();camera.getWorldDirection(_wd);st.camY=+camera.position.y.toFixed(2);st.camDirY=+_wd.y.toFixed(3);st.camPitch=+camPitch.toFixed(3);}catch(e){st.probeErr=e.message;}
@@ -96,7 +98,7 @@ Promise.all([
 setTimeout(runBoot,10000);     // never hard-block if the CDN/assets are slow or offline
 scene.fog=new THREE.Fog(0x87ceeb,100,820);   // pulled in slightly for stronger atmospheric depth (still linear: water shader reads fog.near/far)
 // ---------- post-processing: bloom + cinematic colour grade (degrades gracefully if CDN modules miss) ----------
-let composer=null,bloomPass=null;
+let composer=null,bloomPass=null,ssaoPass=null,smaaPass=null,lowGfx=false;
 if(EffectComposer&&UnrealBloomPass&&RenderPass&&ShaderPass)try{
   composer=new EffectComposer(renderer);
   // SSAO renders the scene itself (beauty * ambient occlusion) → grounds objects with soft contact
@@ -104,6 +106,7 @@ if(EffectComposer&&UnrealBloomPass&&RenderPass&&ShaderPass)try{
   if(SSAOPass){
     const ssao=new SSAOPass(scene,camera,innerWidth,innerHeight);
     ssao.kernelRadius=8; ssao.minDistance=.0008; ssao.maxDistance=.12; ssao.output=SSAOPass.OUTPUT.Default;
+    ssaoPass=ssao;
     composer.addPass(ssao);
   }else composer.addPass(new RenderPass(scene,camera));
   bloomPass=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),.55,.6,.82); // strength, radius, threshold
@@ -123,10 +126,10 @@ if(EffectComposer&&UnrealBloomPass&&RenderPass&&ShaderPass)try{
   composer.addPass(new ShaderPass(GradeShader));
   // SMAA last → restores crisp edges that `antialias:true` cannot provide once we render
   // through an offscreen composer target (MSAA on the canvas is bypassed by post-processing).
-  if(SMAAPass)composer.addPass(new SMAAPass(innerWidth,innerHeight));
+  if(SMAAPass){smaaPass=new SMAAPass(innerWidth,innerHeight);composer.addPass(smaaPass);}
   composer.setSize(innerWidth,innerHeight);
 }catch(e){composer=null;}
-function renderFrame(){composer?composer.render():renderer.render(scene,camera);}
+function renderFrame(){(composer&&!lowGfx)?composer.render():renderer.render(scene,camera);}
 const hemi=new THREE.HemisphereLight(0xbfd6ff,0x4a4034,.6);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff2dd,1.1);
 sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
@@ -1079,29 +1082,30 @@ function updateCrowd(){
 }
 
 // ---------- audio ----------
-let actx=null,eng={},noiseBuf=null,skidGain=null;
+let actx=null,eng={},noiseBuf=null,skidGain=null,masterGain=null;
 function initAudio(){
   if(actx)return;
   try{
     actx=new (window.AudioContext||window.webkitAudioContext)();
+    masterGain=actx.createGain();masterGain.gain.value=settings.volume;masterGain.connect(actx.destination);
     const o=actx.createOscillator();o.type='sawtooth';o.frequency.value=70;
     const lp=actx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=420;
     const g=actx.createGain();g.gain.value=0;
-    o.connect(lp).connect(g).connect(actx.destination);o.start();
+    o.connect(lp).connect(g).connect(masterGain);o.start();
     eng={o,g};
     noiseBuf=actx.createBuffer(1,actx.sampleRate*.5,actx.sampleRate);
     const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
     const ns=actx.createBufferSource();ns.buffer=noiseBuf;ns.loop=true;
     skidGain=actx.createGain();skidGain.gain.value=0;
     const bp=actx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=900;
-    ns.connect(bp).connect(skidGain).connect(actx.destination);ns.start();
+    ns.connect(bp).connect(skidGain).connect(masterGain);ns.start();
     const so=actx.createOscillator();so.type='triangle';so.frequency.value=700;
     const sg=actx.createGain();sg.gain.value=0;
-    so.connect(sg).connect(actx.destination);so.start();
+    so.connect(sg).connect(masterGain);so.start();
     eng.siren=so;eng.sirenG=sg;
     const ho=actx.createOscillator();ho.type='square';ho.frequency.value=392;
     const hg=actx.createGain();hg.gain.value=0;
-    ho.connect(hg).connect(actx.destination);ho.start();
+    ho.connect(hg).connect(masterGain);ho.start();
     eng.hornG=hg;
   }catch(e){}
 }
@@ -1111,7 +1115,7 @@ function crashSound(i){
   const g=actx.createGain();g.gain.setValueAtTime(Math.min(.5,i*.6),actx.currentTime);
   g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.25);
   const lp=actx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=600;
-  s.connect(lp).connect(g).connect(actx.destination);s.start();s.stop(actx.currentTime+.3);
+  s.connect(lp).connect(g).connect(masterGain);s.start();s.stop(actx.currentTime+.3);
 }
 function gunSound(){
   if(!actx)return;
@@ -1119,7 +1123,7 @@ function gunSound(){
   const g=actx.createGain();g.gain.setValueAtTime(.22,actx.currentTime);
   g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.09);
   const hp=actx.createBiquadFilter();hp.type='highpass';hp.frequency.value=1200;
-  s.connect(hp).connect(g).connect(actx.destination);s.start();s.stop(actx.currentTime+.1);
+  s.connect(hp).connect(g).connect(masterGain);s.start();s.stop(actx.currentTime+.1);
 }
 function chime(){
   if(!actx)return;
@@ -1127,7 +1131,7 @@ function chime(){
     const o=actx.createOscillator();o.frequency.value=f;
     const g=actx.createGain();g.gain.setValueAtTime(.15,actx.currentTime+i*.12);
     g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+i*.12+.3);
-    o.connect(g).connect(actx.destination);o.start(actx.currentTime+i*.12);o.stop(actx.currentTime+i*.12+.35);
+    o.connect(g).connect(masterGain);o.start(actx.currentTime+i*.12);o.stop(actx.currentTime+i*.12+.35);
   });
 }
 // dynamic synthesized speech ("simlish" formant blips) — no text, distance-attenuated.
@@ -1140,7 +1144,7 @@ function speak(seed,x,z,kind){
   if(vol<=.02)return;
   seed=(Math.abs(seed|0)%17);
   const base=shout?205:kind==='gruff'?95:120+seed*7;
-  const out=actx.createGain();out.gain.value=vol;out.connect(actx.destination);
+  const out=actx.createGain();out.gain.value=vol;out.connect(masterGain);
   const n=shout?3+(seed%3):4+(seed%3);
   let t=actx.currentTime;
   for(let i=0;i<n;i++){
@@ -1183,10 +1187,35 @@ canvasEl.addEventListener('click',()=>{if(started&&!bigOpen&&!document.pointerLo
 document.addEventListener('pointerlockchange',()=>{pointerLocked=document.pointerLockElement===canvasEl;});
 addEventListener('mousemove',e=>{
   if(!started)return;
-  camYaw-=e.movementX*0.0026;
-  camPitch=M.clamp(camPitch+e.movementY*0.0024,-0.5,1.0);
+  camYaw-=e.movementX*0.0026*settings.sensitivity;
+  camPitch=M.clamp(camPitch+e.movementY*0.0024*settings.sensitivity*(settings.invertY?-1:1),-0.5,1.0);
   lastMouse=perf;
 });
+// ---------- settings ----------
+let settings=loadSettings();
+function setQuality(q){
+  lowGfx=(q==='low');
+  if(ssaoPass)ssaoPass.enabled=(q==='high');
+  if(smaaPass)smaaPass.enabled=(q!=='low');
+  if(bloomPass)bloomPass.enabled=(q!=='low');
+  renderer.shadowMap.enabled=(q!=='low');
+  renderer.setPixelRatio(Math.min(devicePixelRatio,q==='high'?2:q==='med'?1.5:1));
+}
+function applySettings(s){
+  settings=s;
+  if(masterGain)masterGain.gain.value=s.volume;
+  setQuality(s.quality||'high');
+}
+applySettings(settings);
+{ // settings panel DOM wiring (reused by main menu + pause)
+  const $=id=>document.getElementById(id);
+  const sync=()=>{$('setVol').value=settings.volume;$('setSens').value=settings.sensitivity;$('setInvert').checked=settings.invertY;$('setQuality').value=settings.quality;};
+  const change=()=>{applySettings({volume:+$('setVol').value,sensitivity:+$('setSens').value,invertY:$('setInvert').checked,quality:$('setQuality').value});saveSettings(settings);};
+  ['setVol','setSens','setInvert','setQuality'].forEach(id=>$(id).addEventListener('input',change));
+  window.__openSettings=from=>{sync();$('settings').dataset.from=from;$('settings').style.display='flex';};
+  $('setBack').addEventListener('click',()=>{$('settings').style.display='none';const f=$('settings').dataset.from;if(f==='menu')$('intro').style.display='flex';else if(f==='pause')$('pause').style.display='flex';});
+  $('mSettings').addEventListener('click',()=>{$('intro').style.display='none';window.__openSettings('menu');});
+}
 addEventListener('mousedown',()=>{if(started&&!bigOpen)firing=true;start();});
 addEventListener('mouseup',()=>firing=false);
 function start(){if(started||!assetsReady)return;started=true;initAudio();document.getElementById('intro').style.display='none';
