@@ -49,7 +49,7 @@ document.getElementById('c').appendChild(renderer.domElement);
 }
 // asset pipeline: upgrade the procedural env to a real CC0 HDRI when it finishes loading
 const assets=new AssetManager(renderer);
-window.__probe=()=>{const st={parked:parked.length,ai:aiCars.length};
+if(DEBUG)window.__probe=()=>{const st={parked:parked.length,ai:aiCars.length};
   const car=parked.find(v=>v.userData.type==='car')||(aiCars[0]&&aiCars[0].mesh);
   if(car){const bb=new THREE.Box3().setFromObject(car);st.carY=car.position.y;st.minY=+bb.min.y.toFixed(3);st.maxY=+bb.max.y.toFixed(3);st.wheels=car.userData.wheels.length;}
   try{st.dynProps=dynProps.length;st.aliveProps=dynProps.filter(p=>!p.dead).length;st.ramps=ramps.length;st.decks=decks.length;
@@ -80,9 +80,9 @@ window.__probe=()=>{const st={parked:parked.length,ai:aiCars.length};
     st.vehSpd=vehicle&&vehicle.userData.spd!=null?+vehicle.userData.spd.toFixed(2):null;st.vy=+player.vy.toFixed(2);
     const _wd=new THREE.Vector3();camera.getWorldDirection(_wd);st.camY=+camera.position.y.toFixed(2);st.camDirY=+_wd.y.toFixed(3);st.camPitch=+camPitch.toFixed(3);}catch(e){st.probeErr=e.message;}
   return st;}; // TEMP
-window.__tp=(x,z)=>{player.x=x;player.z=z;if(!player.inCar){player.y=0;player.vy=0;}}; // TEMP test teleport
-window.__cam=(p,y)=>{camPitch=p;if(y!==undefined)camYaw=y;}; // TEMP force camera pitch/yaw
-window.__hdg=()=>+player.heading.toFixed(3); // TEMP
+if(DEBUG)window.__tp=(x,z)=>{player.x=x;player.z=z;if(!player.inCar){player.y=0;player.vy=0;}}; // TEMP test teleport
+if(DEBUG)window.__cam=(p,y)=>{camPitch=p;if(y!==undefined)camYaw=y;}; // TEMP force camera pitch/yaw
+if(DEBUG)window.__hdg=()=>+player.heading.toFixed(3); // TEMP
 let assetsReady=false;
 function markReady(){
   if(assetsReady)return;assetsReady=true;
