@@ -1,4 +1,4 @@
-// GTA — Bharat Version. ESM entry (Phase 1 scaffold of the asset-pipeline refactor).
+// Gully Run — ESM entry (asset-pipeline refactor scaffold).
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -1353,7 +1353,7 @@ function boot(){
     pc.position.set(Lm.x+Lm.hw+3.5,0,Lm.z);pc.rotation.y=Math.PI/2;parked.push(pc);break;}
   buildTrees();
 }
-// ---------- cheat codes (just type the letters, classic GTA style) ----------
+// ---------- cheat codes (just type the letters, classic arcade style) ----------
 let cheatBuf='';
 function spawnCheatVeh(v,msg){
   v.position.set(player.x+Math.cos(player.heading)*4.5,0,player.z-Math.sin(player.heading)*4.5);
@@ -2157,8 +2157,8 @@ function finishJack(){
     const i=aiCars.indexOf(ai);if(i>=0)aiCars.splice(i,1);
     spawnAI(near.userData.type==='bike');
   }
-  if(isPolice){addWanted(2);showMsg('GRAND THEFT AUTO: POLICE CRUISER!');}   // stealing any cruiser = 2 stars
-  else if(ai){showMsg('GRAND THEFT AUTO!');if(policeNear(70))addWanted(1);}
+  if(isPolice){addWanted(2);showMsg('POLICE CRUISER STOLEN!');}   // stealing any cruiser = 2 stars
+  else if(ai){showMsg('CARJACKED!');if(policeNear(70))addWanted(1);}
   const pIdx=parked.indexOf(near);if(pIdx>=0)parked.splice(pIdx,1);
   vehicle=near;player.inCar=true;
   player.x=near.position.x;player.z=near.position.z;
@@ -2861,7 +2861,7 @@ function animate(){
   if(isFinite(player.x)&&isFinite(player.y)&&isFinite(player.z)){player._gx=player.x;player._gy=player.y;player._gz=player.z;}
   else{player.x=player._gx||0;player.y=player._gy||0;player.z=player._gz||0;player.vx=player.vz=player.vy=0;player.airborne=false;}
 
-  // --- camera (mouse-orbit, GTA-style) ---
+  // --- camera (third-person, mouse-orbit) ---
   const spd=Math.hypot(player.vx,player.vz);
   // slowly swing back behind the player when driving and the mouse is idle
   if(player.inCar&&spd>.25&&perf-lastMouse>1.5){
