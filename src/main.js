@@ -808,9 +808,13 @@ function makeCar(color,cop,forceModel){
     rl.position.set(-.35,2.05,-.2);bl.position.set(.35,2.05,-.2);g.add(rl,bl);
     ud.beacons=[rl,bl];
   }
+  const brakeMat=tailMat.clone();   // per-car tail/brake material so only the driven car lights up
+  for(const sx of[-.7,.7]){const bl2=new THREE.Mesh(new THREE.BoxGeometry(.34,.18,.12),brakeMat);bl2.position.set(sx,.7,-2.45);g.add(bl2);}
+  ud.brakeMat=brakeMat;
   g.userData=ud;scene.add(g);return g;
 }
 function makeCarProcedural(color,cop,forceModel){
+  const brakeMat=tailMat.clone();
   const g=new THREE.Group();
   const paint=new THREE.MeshStandardMaterial({color,roughness:.3,metalness:.6,envMapIntensity:1.1});
   const glass=new THREE.MeshStandardMaterial({color:0x0e151d,roughness:.05,metalness:.95,envMapIntensity:1.5,transparent:true,opacity:.6});
@@ -836,9 +840,9 @@ function makeCarProcedural(color,cop,forceModel){
   }
   for(const sx of[-0.75,0.75]){
     const hl=new THREE.Mesh(new THREE.BoxGeometry(.5,.25,.1),headMat);hl.position.set(sx,.85,2.52);g.add(hl);
-    const tl=new THREE.Mesh(new THREE.BoxGeometry(.5,.2,.1),tailMat);tl.position.set(sx,.85,-2.52);g.add(tl);
+    const tl=new THREE.Mesh(new THREE.BoxGeometry(.5,.2,.1),brakeMat);tl.position.set(sx,.85,-2.52);g.add(tl);
   }
-  const ud={wheels,hp:100,type:'car',rad:1.7,paint,door:doorGrp,cls:cop?'police':(forceModel||'sedan')};
+  const ud={wheels,hp:100,type:'car',rad:1.7,paint,door:doorGrp,cls:cop?'police':(forceModel||'sedan'),brakeMat};
   if(forceModel==='taxi')ud.taxi=true;
   if(cop){
     const rl=new THREE.Mesh(new THREE.BoxGeometry(.5,.22,.4),new THREE.MeshPhongMaterial({color:0xff0000,emissive:0xff0000,emissiveIntensity:1}));
@@ -2496,6 +2500,7 @@ function animate(){
         body.rotation.x=M.lerp(body.rotation.x,player.airborne?M.clamp(-player.vy*.018,-.45,.45):M.clamp(-longA*1.7,-.12,.15),.16);
       }
       vehicle.userData.wheels.forEach((w,i)=>{w.rotation.x+=vf*.7*dtF;if(!bike&&i<2)w.rotation.y=player.steer*.42;});
+      if(vehicle.userData.brakeMat)vehicle.userData.brakeMat.emissiveIntensity=(k.dn||k.hb)?2.4:.4;   // brake lights glow when braking/handbraking
       if(boost&&frame%3===0)spawnP(pp.x-nfx*2.6,.5,pp.z-nfz*2.6,0x66bbff,.3,.3,rnd(-.05,.05),.05,rnd(-.05,.05));
       if(vehicle.userData.hp<40&&frame%6===0)spawnP(pp.x+nfx*2,1.3,pp.z+nfz*2,0x555555,.45,1,rnd(-.03,.03),.12,rnd(-.03,.03),{grav:-.004,grow:1.03,drag:.9});   // damage smoke rises & billows
       if(frame%9===0&&Math.abs(vf)<.3&&!bike)spawnP(pp.x-nfx*2.7,.4,pp.z-nfz*2.7,0x888888,.14,.5,0,.04,0,{grav:-.002,grow:1.04,drag:.92});   // idle exhaust puff drifts up
