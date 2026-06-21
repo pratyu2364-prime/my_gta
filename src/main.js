@@ -2848,8 +2848,13 @@ function animate(){
   if(actx&&eng.g){
     if(actx.state==='suspended')actx.resume();
     const inCar=player.inCar&&vehicle&&!vehicle.userData.dead;
-    eng.g.gain.value=inCar?.045:0;
-    eng.o.frequency.value=65+spd*170+(k.up?18:0);
+    const vt=inCar?vehicle.userData.type:null,ground=inCar&&vt!=='plane'&&vt!=='heli';
+    // engine: volume swells under power, pitch rises with speed (bikes rev higher); both smoothed to avoid zipper noise
+    const tgtGain=ground?(.028+spd*.05+(k.up?.018:0)):0;
+    eng.g.gain.value+=(tgtGain-eng.g.gain.value)*Math.min(1,.25*dtF);
+    const revBase=vt==='bike'?95:vt==='auto'?58:70;
+    const tgtFreq=ground?(revBase+spd*(vt==='bike'?230:170)+(k.up?20:0)):eng.o.frequency.value;
+    eng.o.frequency.value+=(tgtFreq-eng.o.frequency.value)*Math.min(1,.3*dtF);
     skidGain.gain.value=(inCar&&k.hb&&spd>.35)?.12:0;
     eng.hornG.gain.value=(inCar&&k.horn)?.12:0;
     const pd=nearestPoliceDist();   // siren swells as the nearest unit closes in
