@@ -1,17 +1,20 @@
-# Grand Thief Auxto: Bharat Version — a GTA-style open world in one HTML file
+# Gully Run — an open-world driving sandbox
 
-A free-roam crime sandbox in the spirit of classic GTA, written as a **single self-contained
-`gta_sim.html`** (three.js r128 from CDN — no build step, no install).
+An original free-roam driving sandbox set in a procedurally generated city, built with
+**three.js r128** as a static ES-module project (no build step). `index.html` is a thin shell
+(HUD, menus, import map) that loads `src/main.js`. three.js and the font are vendored locally
+under `vendor/`, so the game runs **fully offline**.
 
-## Run it
+## Run it (web / dev)
 
-Open `gta_sim.html` in any modern browser. From WSL:
+ES modules need to be served over HTTP (not `file://`). From the repo root:
 
 ```bash
-explorer.exe gta_sim.html      # or: wslview gta_sim.html
+python3 -m http.server 8099
+# then open http://localhost:8099/index.html
 ```
 
-Needs internet on first load (three.js + font come from CDNs). Click or press any key to start.
+The hosted build is the same files served statically (e.g. GitHub Pages).
 
 ## Controls
 
@@ -19,50 +22,50 @@ Needs internet on first load (three.js + font come from CDNs). Click or press an
 |---|---|
 | W A S D / arrows | drive / walk |
 | MOUSE | look around & aim (click to lock the pointer) |
-| E | enter / exit vehicles, **carjack** (walk to door, pull the driver out) |
+| E | enter / exit vehicles, carjack (walk to door, pull the driver out) |
 | SPACE | handbrake — drift |
 | SHIFT | nitro boost / sprint |
 | CLICK / F | shoot |
 | Q | switch weapon |
 | H | horn |
 | M | full city map |
+| ESC | pause |
+
+From the main menu: **New Game**, **Continue** (restores saved money/weapons), **Settings**
+(volume, mouse sensitivity, invert-Y, graphics quality).
 
 ## Features
 
-- **Asymmetric procedural city** — irregular road grid with partial dead-end streets,
-  downtown / midtown / outskirts districts, parks; different layout every load
-- **Mouse-look camera that steers you** — GTA-style free orbit (pointer lock); on foot the
-  character walks where the camera faces and turns to follow it; aim where you look
-- **Talk to people** — press **T** near anyone for a speech bubble (Bharat-flavored chatter)
-- **Bharat detailing** — auto-rickshaws in traffic, roaming cows, roadside market stalls,
-  instanced street furniture (bins, hydrants, benches), zones like Connaught Place
-- **Enterable landmarks with interiors & roofs** — hospital, food court, and a police
-  station staffed with officers; the roof fades away as you step inside
-- **Detailed characters & big crowds** — rounded low-poly humanoids with **faces**
-  (eyes/brows/mouth); player, cops, drivers, pedestrians. The civilian crowd is
-  GPU-instanced (one draw call per body part) so it scales to hundreds
-- **Held weapons** — pistol / uzi / shotgun are visibly held and aimed in-hand, with
-  muzzle flash and bullets from the barrel
-- **Enterable landmarks** — walk into the **hospital** (heals you), **food court** (heals
-  you), and **police station**; each has signage, an interior, and a map blip
-- **Smarter police** — siren volume rises as the nearest unit closes in; officers get out
-  and **open your car door before arresting you** (speed off and the bust is cancelled);
-  stealing a car only earns a wanted star if the cops are nearby to witness it
-- **On-foot + vehicles** — cars and motorcycles, all stealable with a proper jack
-  sequence (door swings open, driver thrown to the street); drivers/riders are visible
-  through glass cabins
-- **Wanted system** — up to 5 stars; cruisers flank and pull over, officers step out and
-  **bust you at your door**; at 2+ stars they open fire
-- **Weapons** — pistol / uzi / shotgun pickups (green blips), drive-bys, destructible cop cars
-- **Living traffic** — lane keeping, queuing, working traffic lights, U-turns at dead ends,
-  braking for pedestrians and for you; peds flee, get run over, get thrown out of cars
-- **Day/night cycle** (~8 min) — sunsets, stars, lit building windows, street lamps,
-  real headlight beams
-- **Missions** — chained deliveries with cash rewards; GTA-style HUD with rotating minimap,
-  zone names, wanted stars, damage vignette, in-game clock
-- **Synthesized audio** — engine, tire squeal, gunshots, siren, horn, crashes (Web Audio,
-  zero audio files)
+- Asymmetric procedural city — irregular road grid, districts, parks; a different layout each load
+- Mouse-look third-person camera that also steers you on foot
+- Cars, motorcycles and auto-rickshaws, all stealable with a full carjack sequence
+- GPU-instanced crowds, talkable NPCs, roaming cows, market stalls and street furniture
+- Enterable landmarks with interiors (hospital, food court, police station)
+- Wanted system (up to 5 stars), pursuing cruisers and foot officers, drive-bys
+- Living traffic — lane keeping, traffic lights, braking for pedestrians
+- Day/night cycle with headlights, lit windows and street lamps
+- Missions — taxi, vigilante, race circuit, courier deliveries
+- Progression auto-save, pause, settings, synthesized Web Audio (no audio files)
+
+## Desktop build (Electron) → Steam
+
+The game ships as a desktop app via Electron. The Electron main process serves the static
+files over an in-process `localhost` origin (not `file://`) so ES modules, the import map and
+`fetch()` for models/HDRI all work exactly as on the web.
+
+```bash
+npm install            # installs electron + electron-builder (dev deps)
+npm start              # run the desktop app locally
+npm run dist           # build installers for the current OS into dist-electron/
+npm run dist:dir       # build the unpacked app dir (what you upload to Steam via SteamPipe)
+```
+
+**Steam checklist (done outside this repo):** Steamworks partner account + $100 Steam Direct
+fee per app, identity/tax/bank verification, age-rating questionnaire, store-page assets, then
+upload the `dist:dir` build with SteamPipe. The app is original-IP and contains no third-party
+trademarks.
 
 ## Dev / testing
 
 See [CLAUDE.md](CLAUDE.md) for architecture notes and the headless test harness.
+`scripts/vendor-three.mjs` re-vendors three.js + addons locally if needed.
