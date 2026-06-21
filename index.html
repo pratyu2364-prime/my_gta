@@ -37,7 +37,7 @@
   #err{position:fixed;inset:0;z-index:99;display:none;background:#fff;color:#c0392b;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:30px}
 </style>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Russo+One&display=swap');
+  @font-face{font-family:'Russo One';font-style:normal;font-weight:400;font-display:swap;src:url('./vendor/fonts/russo-one.woff2') format('woff2');}
   #money,#speedo,#weapon,#msg,#zone,.death,#intro h1{font-family:'Russo One','Arial Black',Arial,sans-serif!important;font-style:normal!important}
   #stars.hot .on{animation:starpulse .55s infinite}
   @keyframes starpulse{50%{text-shadow:0 0 14px #ffd23e,0 0 4px #fff}}
@@ -126,8 +126,8 @@
 <script type="importmap">
 {
   "imports": {
-    "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+    "three": "./vendor/three/build/three.module.js",
+    "three/addons/": "./vendor/three/examples/jsm/"
   }
 }
 </script>
