@@ -14,3 +14,4 @@ node_modules/
 # build artifacts
 dist/
 dist-electron/
+scripts/.playtest.png
