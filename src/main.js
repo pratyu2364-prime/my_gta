@@ -1323,7 +1323,7 @@ function shoot(x,y,z,ang,from,dmg,vy){
   m.position.set(x,y,z);m.rotation.y=ang;scene.add(m);
   bullets.push({m,vx:Math.sin(ang)*1.6,vz:Math.cos(ang)*1.6,vy:vy||0,life:.55,from,dmg});
   gunSound();
-  if(from==='player')scarePeds(x,z,15);
+  scarePeds(x,z,from==='player'?15:10);
 }
 
 // ---------- traffic (cars + bikes, with drivers/riders) ----------
@@ -1909,7 +1909,7 @@ function explode(p){
   for(let i=0;i<16;i++)spawnP(p.x,1.5,p.z,pick([0x333333,0x555555,0x222222]),rnd(.7,1.6),rnd(1.0,1.8),rnd(-.4,.4),rnd(.25,.6),rnd(-.4,.4),{grow:1.035,drag:.92,grav:-.006});   // hot smoke rises
   for(let i=0;i<14;i++)spawnP(p.x,1.5,p.z,pick([0xff6a00,0xffae00,0xff2200,0xfff1b0]),rnd(.3,.8),rnd(.6,1.1),rnd(-.7,.7),rnd(.3,.9),rnd(-.7,.7),{grow:.95,bounce:.3,drag:.85,grav:.02});
   const l=new THREE.PointLight(0xff8800,6,60);l.position.set(p.x,4,p.z);scene.add(l);
-  setTimeout(()=>scene.remove(l),350);crashSound(1);addShake(1.1);
+  setTimeout(()=>scene.remove(l),350);crashSound(1);addShake(1.1);scarePeds(p.x,p.z,30);
 }
 // ---------- tyre-skid decals (pooled flat ground quads laid down while drifting/handbraking) ----------
 const skids=[],SKIDMAX=100;
