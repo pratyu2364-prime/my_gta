@@ -23,6 +23,7 @@ Source of truth for the autonomous loop. A fresh `/ship` session resumes from th
 | TERRAIN-002 | Natural rolling hills replace the cone-mountain ring | 3 | none | done | 1 | #8 |
 | LIFE-001 | Explosions/loud events scatter the crowd | 4 | none | done | 1 | #11 |
 | LIFE-002 | Day/night crowd density — sparser at night | 4 | none | done | 1 | #12 |
+| LIFE-003 | AI traffic lights its brake lights when braking | 4 | none | done | 1 | #14 |
 
 ## Activity log
 - 2026-07-01 — `.vibe/` scaffolded (autopilot, opencode+sonnet workers, headless gameplay gate). Awaiting first `/align`.
