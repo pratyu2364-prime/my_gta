@@ -1960,7 +1960,8 @@ function endTaxiJob(){if(taxi.pax){if(taxi.pax.parent)taxi.pax.parent.remove(tax
 const racers=[];const RACE_LAPS=2;
 function startRace(){
   if(race.active)return;
-  race.active=true;race.lap=0;race.pos=1;race.lastWp=0;race.t=0;
+  if(!player.inCar||!vehicle||(vehicle.userData.type!=='car'&&vehicle.userData.type!=='race')){showMsg('Get in a car to race');return;}
+  race.active=true;race.lap=0;race.pos=1;race.lastWp=0;race.t=0;race.started=false;
   const a0=race.wp[0],a1=race.wp[1];const dx=a1.x-a0.x,dz=a1.z-a0.z,L=Math.hypot(dx,dz)||1;const ux=dx/L,uz=dz/L,px=-uz,pz=ux;
   for(let i=0;i<3;i++){const m=makeCar(pick([0xff3030,0x30a0ff,0x30d060]),false,'race');
     m.position.set(a0.x-ux*(6+i*5)+px*(i%2?2.5:-2.5),0,a0.z-uz*(6+i*5)+pz*(i%2?2.5:-2.5));
@@ -1968,8 +1969,8 @@ function startRace(){
   showMsg('🏁 RACE! '+RACE_LAPS+' laps — beat the field!');
 }
 function endRace(place){
-  race.active=false;for(const r of racers)scene.remove(r.mesh);racers.length=0;
-  if(place!=null){const prize=place===1?8000:place===2?3000:place===3?1500:500;money+=prize;chime();showMsg('🏆 Finished P'+place+'  +'+prize);}
+  const participated=race.started;race.active=false;for(const r of racers)scene.remove(r.mesh);racers.length=0;
+  if(place!=null&&participated){const prize=place===1?8000:place===2?3000:place===3?1500:500;money+=prize;chime();showMsg('🏆 Finished P'+place+'  +'+prize);}
 }
 function raceUpdate(dt,dtF){
   if(!race.active)return;race.t+=dt;
@@ -1982,7 +1983,7 @@ function raceUpdate(dt,dtF){
     if(d<7){r.wpIdx++;if(r.wpIdx>=race.wp.length){r.wpIdx=0;r.lap++;}}
   }
   const nx=race.wp[(race.lastWp+1)%race.wp.length];
-  if(pdist(nx.x,nx.z)<10){race.lastWp=(race.lastWp+1)%race.wp.length;if(race.lastWp===0)race.lap++;}
+  if(pdist(nx.x,nx.z)<10){race.lastWp=(race.lastWp+1)%race.wp.length;if(race.lastWp===0)race.lap++;if(!race.started)race.started=true;}
   const pScore=race.lap*race.wp.length+race.lastWp;let ahead=0;
   for(const r of racers)if(r.lap*race.wp.length+r.wpIdx>pScore)ahead++;
   race.pos=ahead+1;
