@@ -1,0 +1,28 @@
+# my_gta — vibe-loop config (read by the `align` + `ship` skills).
+# Workflow: Opus aligns/reviews/orchestrates; opencode+Sonnet workers write code;
+# every PR is gameplay-smoke-tested headless before merge. Autopilot + /loop.
+
+intervention: autopilot          # self-merge on green CI + gameplay test, no approvals
+reviewer: claude                 # Opus reviews every diff against task acceptance
+workers: [opencode/claude-sonnet]   # codegen agent: `opencode run -m claude-sonnet`
+                                 # (verify the alias with `opencode models`; add hermes/grok to escalate)
+
+commands:                        # ship runs these locally before opening a PR
+  lint: "cp src/main.js /tmp/_gtacheck.mjs && node --check /tmp/_gtacheck.mjs"
+  test: "node scripts/playtest.cjs"   # headless boot + scripted play + #err overlay check
+  build: ""                      # static ES-module project, no build step
+
+gates:
+  approve_plan: false
+  approve_merge: false
+  approve_deploy: false
+
+limits:
+  retry_cap: 2                   # worker attempts before marking the task blocked
+  max_tasks_per_run: 8
+
+# --- extensions honored by the Opus orchestrator (not stock ship fields) ---
+on_empty: propose                # when no ready tasks remain: Opus drafts a new batch
+                                 # from docs/superpowers/specs + the refinement plan, then
+                                 # continues. Set to `stop` to halt and ask the user instead.
+paused: false

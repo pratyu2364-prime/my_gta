@@ -1,0 +1,24 @@
+# my_gta — Build Tracker
+
+Source of truth for the autonomous loop. A fresh `/ship` session resumes from this file.
+
+## Control panel
+- **Mode:** autopilot + `/loop` (self-merge on green CI + gameplay test, no approvals)
+- **Workers:** opencode / claude-sonnet (escalate: add hermes/grok in config.yml)
+- **Reviewer:** Opus (every diff vs task acceptance)
+- **Gameplay gate:** `node scripts/playtest.cjs` must pass before any merge
+- **On empty:** Opus proposes a new task batch and continues (`on_empty: propose`)
+- **Paused:** no
+
+## Legend
+`todo` ready · `in_progress` worker coding · `in_review` PR open / CI · `done` merged + deployed · `failed` retry pending · `blocked` exceeded retry_cap
+
+## Board
+| id | title | phase | depends_on | status | attempts | PR |
+|----|-------|-------|-----------|--------|----------|----|
+| QA-001 | Race only pays out if the player actually raced | 1 | none | todo | 0 | — |
+| QA-002 | Enter prompt verb matches vehicle type (drive vs ride) | 1 | none | todo | 0 | — |
+
+## Activity log
+- 2026-07-01 — `.vibe/` scaffolded (autopilot, opencode+sonnet workers, headless gameplay gate). Awaiting first `/align`.
+- 2026-07-01 — QA sweep (Opus): probed every system headless (boot, on-foot, weapons, talk, carjack/drive, wanted+police, vigilante; full code review of missions/economy/death). **Zero JS/engine-crash bugs — game is crash-robust.** Headless "crashes" were swiftshader GL deaths under simultaneous heavy load (test-env only, no JS error). Validated 2 real minor issues → QA-001 (race payout exploit), QA-002 (drive/ride wording). Dropped 2 false positives (foot-speedo km/h and knife-at-spawn are both intentional). Fixed test infra: gameplay gate now starts the real game via `__start` (was a no-op `KeyP`) and fail-fasts on browser death instead of hanging to timeout.
