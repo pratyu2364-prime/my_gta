@@ -2,7 +2,7 @@ id: PROP-001
 title: GitHub Actions CI — run lint + headless gameplay gate on every PR
 phase: 2
 depends_on: none
-status: todo
+status: done
 attempts: 0
 acceptance:
  - A workflow at .github/workflows/ci.yml runs on pull_request to main.
