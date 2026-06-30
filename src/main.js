@@ -1060,6 +1060,7 @@ const iFace=new THREE.InstancedMesh(faceGeo,faceMat,MAXP);
 iFace.frustumCulled=false;iFace.instanceMatrix.setUsage(THREE.DynamicDrawUsage);scene.add(iFace);
 const CROWD=[iLegL,iLegR,iHip,iTorso,iArmL,iArmR,iHead,iHair,iFace];
 const _zero=new THREE.Matrix4().makeScale(0,0,0);
+let crowdActive=MAXP;
 for(let i=0;i<MAXP;i++)for(const m of CROWD)m.setMatrixAt(i,_zero);
 let colorsDirty=false;
 function setCrowdColor(i,skin,shirt,pants,hair){
@@ -1083,7 +1084,11 @@ const _oTorso=new THREE.Matrix4().makeTranslation(0,REST.torso,0),
 function _rigid(mesh,i,off){_W.multiplyMatrices(_R,off);mesh.setMatrixAt(i,_W);}
 function _limb(mesh,i,joint,swing){_Rx.makeRotationX(swing);_J.multiplyMatrices(joint,_Rx);_W.multiplyMatrices(_R,_J);mesh.setMatrixAt(i,_W);}
 function updateCrowd(){
+  const dayF=M.smoothstep(Math.sin((tod-.25)*Math.PI*2),-.18,.42);
+  const tgt=Math.round((0.4+0.6*dayF)*peds.length);
+  crowdActive+=M.clamp(tgt-crowdActive,-2,2);
   for(let i=0;i<peds.length;i++){
+    if(i>=crowdActive){for(const m of CROWD)m.setMatrixAt(i,_zero);continue;}
     const p=peds[i];
     if(p.state==='down'){_e.set(1.5,p.dyaw,0);_pos.set(p.x,.3,p.z);}
     else{_e.set(0,p.heading,0);_pos.set(p.x,p.bob,p.z);}
