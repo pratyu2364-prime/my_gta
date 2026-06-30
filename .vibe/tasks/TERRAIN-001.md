@@ -2,7 +2,7 @@ id: TERRAIN-001
 title: Deliberate, well-spaced river bridges (not random/sparse)
 phase: 3
 depends_on: none
-status: todo
+status: done
 attempts: 0
 acceptance:
  - The river always has a sensible number of crossings (target ~3, scaled to river length), spaced roughly evenly along z and kept clear of the spawn band — never zero, never absurdly clustered.

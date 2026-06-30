@@ -2,7 +2,7 @@ id: TERRAIN-002
 title: Natural rolling hills replace the decorative cone-mountain ring
 phase: 3
 depends_on: none
-status: todo
+status: done
 attempts: 0
 acceptance:
  - The decorative mountain ring (src/main.js ~lines 589-602, ConeGeometry cones) is replaced with natural-looking rolling hills — irregular, rounded, varied-height silhouettes (vertex-displaced / noise-based geometry, NOT 4-sided spikes).
