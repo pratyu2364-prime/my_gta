@@ -1,0 +1,25 @@
+name: CI
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  gameplay-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Lint (syntax check of the game module)
+        run: cp src/main.js /tmp/_chk.mjs && node --check /tmp/_chk.mjs
+      - name: Install headless browser deps
+        run: |
+          mkdir -p .citest && cd .citest
+          npm init -y >/dev/null 2>&1
+          npm i puppeteer-core@23 >/dev/null 2>&1
+          npx --yes @puppeteer/browsers install chrome-headless-shell@stable | tee /tmp/cinstall.txt
+      - name: Gameplay gate
+        run: |
+          CHROME_BIN=$(grep -oE '/[^ ]*chrome-headless-shell-linux64/chrome-headless-shell' /tmp/cinstall.txt | head -1)
+          echo "chrome-headless-shell: $CHROME_BIN"
+          PUPPETEER_DIR="$PWD/.citest/node_modules" CHROME_BIN="$CHROME_BIN" node scripts/playtest.cjs
