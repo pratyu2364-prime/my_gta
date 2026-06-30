@@ -193,7 +193,12 @@ let river=null;
     const rcx=(cityX[riverIdx].c+cityX[riverIdx+1].c)/2, rHalf=Math.min(16,bestGap/2-HALF-3);
     river={cx:rcx,x0:rcx-rHalf,x1:rcx+rHalf,half:rHalf};
     for(const b of blocks)if(b.cx>river.x0-2&&b.cx<river.x1+2)b.river=true;
-    river.cross=cityZ.filter(W=>W.a<river.x0-2&&W.b>river.x1+2).map(W=>W.c); // horizontal roads that bridge it
+    // guarantee ~3 well-spaced spanning crossings (avoid spawn band)
+    let cands=cityZ.filter(W=>Math.abs(W.c-spawnZ)>70).sort((a,b)=>a.c-b.c);
+    const n=Math.max(2,Math.min(4,Math.floor(cands.length/12)));
+    const idxs=[];for(let k=0;k<n;k++)idxs.push(Math.floor((k+0.5)*cands.length/n));
+    for(const i of idxs){const W=cands[i];W.a=Math.min(W.a,river.x0-4);W.b=Math.max(W.b,river.x1+4);}
+    river.cross=idxs.map(i=>cands[i].c).sort((a,b)=>a-b);
   }
 }
 function paintCity(ctx,S,mini){
