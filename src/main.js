@@ -1548,6 +1548,7 @@ function aiUpdate(ai,dtF){
     if(side<2.2)target=Math.min(target,gap<5?0:.12);
   }
   ai.cur+=M.clamp(target-ai.cur,-.05*dtF,(ai.panic?.03:.015)*dtF);   // panicking drivers accelerate harder
+  if(ai.mesh.userData.brakeMat)ai.mesh.userData.brakeMat.emissiveIntensity=(target<ai.cur-.01||target<0.01)?2.4:.4;
   const newPos=pos+ai.dir*ai.cur*dtF;
   if(ai.axis==='z')m.position.z=newPos;else m.position.x=newPos;
   // turn at intersections (after moving, so newPos applied to the old axis)
