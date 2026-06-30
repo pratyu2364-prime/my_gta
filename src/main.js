@@ -2249,7 +2249,7 @@ function handleEnterExit(dtF){
     const near=nearestEnterable();
     if(near){
       const t0=near.userData.type;const what=t0==='bike'?'bike':t0==='auto'?'auto':t0==='plane'?'plane':t0==='heli'?'helicopter':'car';
-      prompt.innerHTML='Press <b>E</b> to '+(parked.includes(near)?'ride this '+what:'<b>steal</b> this '+what);
+      prompt.innerHTML='Press <b>E</b> to '+(parked.includes(near)?(t0==='car'?'drive':t0==='bike'||t0==='auto'?'ride':t0==='plane'||t0==='heli'?'fly':'drive')+' this '+what:'<b>steal</b> this '+what);
       prompt.style.opacity=1;
     }else prompt.style.opacity=0;
     if(pressedE&&exitCool<=0&&near){exitCool=.6;startJack(near);}
