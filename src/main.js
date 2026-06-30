@@ -599,10 +599,18 @@ buildFlyover((stuntZone.x0+stuntZone.x1)/2, stuntZone.z, stuntZone.x1-stuntZone.
   for(let i=0;i<N;i++){
     const a=(i/N)*Math.PI*2+rnd(-.06,.06), rad=rnd(540,660), h=rnd(70,185), br=rnd(60,130);
     const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
-    const m=new THREE.Mesh(new THREE.ConeGeometry(br,h,4+(Math.random()*4|0),1),rockMat);
-    m.position.set(x,h/2-6,z);m.rotation.y=rnd(0,7);scene.add(m);
-    if(h>120){const capH=h*.3;const cap=new THREE.Mesh(new THREE.ConeGeometry(br*.34,capH,6),snowMat);
-      cap.position.set(x,(h-6)-capH*.4,z);scene.add(cap);}
+    const g=new THREE.IcosahedronGeometry(br,1);
+    const pos=g.attributes.position;
+    for(let j=0;j<pos.count;j++){
+      const vx=pos.getX(j),vy=pos.getY(j),vz=pos.getZ(j);
+      const n=(vx+vy+vz)*.7;const jitter=Math.sin(n)*.12+Math.cos(n*1.7)*.07;
+      pos.setXYZ(j,vx*(1+jitter*.4),vy*(1+jitter*.5+.1),vz*(1+jitter*.4));
+    }
+    pos.needsUpdate=true;g.computeVertexNormals();
+    const m=new THREE.Mesh(g,rockMat);
+    m.position.set(x,h/2-6,z);m.scale.set(1,h/br,1);m.rotation.y=rnd(0,7);scene.add(m);
+    if(h>120){const capH=h*.3;const cap=new THREE.Mesh(new THREE.IcosahedronGeometry(br*.34,1),snowMat);
+      cap.position.set(x,(h-6)-capH*.4,z);cap.scale.set(1,capH/(br*.34),1);scene.add(cap);}
   }
 }
 // forest belt in the outskirts — positions collected, instanced from GLB trees in boot()
