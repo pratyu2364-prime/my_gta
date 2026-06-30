@@ -19,9 +19,13 @@ Source of truth for the autonomous loop. A fresh `/ship` session resumes from th
 | QA-001 | Race only pays out if the player actually raced | 1 | none | done | 3 | #2 |
 | QA-002 | Enter prompt verb matches vehicle type (drive vs ride) | 1 | none | done | 1 | #3 |
 | PROP-001 | GitHub Actions CI — lint + headless gameplay gate on PRs | 2 | none | done | 4 | #5 |
+| TERRAIN-001 | Deliberate, well-spaced river bridges (not random/sparse) | 3 | none | done | 1 | #7 |
+| TERRAIN-002 | Natural rolling hills replace the cone-mountain ring | 3 | none | done | 1 | #8 |
 
 ## Activity log
 - 2026-07-01 — `.vibe/` scaffolded (autopilot, opencode+sonnet workers, headless gameplay gate). Awaiting first `/align`.
+- 2026-07-01 — TERRAIN-001 **done** (PR #7, green CI) + TERRAIN-002 **done** (PR #8, green CI). Both grok-4.3, single clean attempt each. Bridges now ~2-4 well-spaced crossings with real approaches; hills are jittered icosahedron forms (verified on horizon screenshot). Board clear.
+- 2026-07-01 — `/align` (world life → terrain): queued TERRAIN-001 (deliberate well-spaced bridges; current river.cross is arbitrary→sparse) + TERRAIN-002 (natural rolling hills replacing cone-mountain ring, decorative). Hills scoped to look-only (drivable hills deferred — flat-ground architecture). Awaiting sign-off.
 - 2026-07-01 — PROP-001 **done** (PR #5, merged on GREEN CI — first real remote gate). Worker grok-4.3 created then self-deleted the file → authored directly. CI fixed across 4 runs: invalid npm dir name `.citest`→`citest`, then channel-alias 404 (node install API doesn't resolve `stable` → switched to `@puppeteer/browsers` CLI + pipefail). Final: chrome installs + gameplay gate passes in 55s.
 - 2026-07-01 — Board emptied (QA-001/002 done) → `on_empty: propose`: queued PROP-001 (remote CI, validated gap). Gameplay proposals await user sign-off.
 - 2026-07-01 — QA-002 **done** (PR #3, merged). Worker xai/grok-4.3, single clean attempt. Gate: lint OK + gameplay OK.
