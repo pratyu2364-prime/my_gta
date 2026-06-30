@@ -15,4 +15,4 @@ node_modules/
 dist/
 dist-electron/
 scripts/.playtest.png
-.citest/
+citest/

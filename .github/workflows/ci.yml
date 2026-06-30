@@ -15,7 +15,7 @@ jobs:
       - name: Install headless browser deps
         run: |
           set -eux
-          mkdir -p .citest && cd .citest
+          mkdir -p citest && cd citest
           npm init -y
           npm install puppeteer-core@23 @puppeteer/browsers
           node -e "const{install}=require('@puppeteer/browsers');install({browser:'chrome-headless-shell',buildId:'stable',cacheDir:process.env.HOME+'/.cache/puppeteer'}).then(b=>console.log('CHROME_BIN='+b.executablePath)).catch(e=>{console.error(e);process.exit(1)})" | tee /tmp/cinstall.txt
@@ -24,4 +24,4 @@ jobs:
           set -eux
           CHROME_BIN=$(grep -oE 'CHROME_BIN=.*' /tmp/cinstall.txt | head -1 | cut -d= -f2-)
           test -x "$CHROME_BIN"
-          PUPPETEER_DIR="$PWD/.citest/node_modules" CHROME_BIN="$CHROME_BIN" node scripts/playtest.cjs
+          PUPPETEER_DIR="$PWD/citest/node_modules" CHROME_BIN="$CHROME_BIN" node scripts/playtest.cjs
