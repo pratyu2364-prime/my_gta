@@ -4,8 +4,11 @@
 
 intervention: autopilot          # self-merge on green CI + gameplay test, no approvals
 reviewer: claude                 # Opus reviews every diff against task acceptance
-workers: [opencode/claude-sonnet]   # codegen agent: `opencode run -m claude-sonnet`
-                                 # (verify the alias with `opencode models`; add hermes/grok to escalate)
+workers: [opencode/big-pickle, xai/grok-4.3]   # codegen agents in escalation order.
+                                 # NOTE: opencode has no Anthropic creds here (only Google + xAI), so
+                                 # Sonnet isn't available — big-pickle is opencode's native code model
+                                 # (proven in pixel-dweller); grok-4.3 escalates. Dispatch:
+                                 # `echo "<prompt>" | opencode run -m big-pickle` / `-m xai/grok-4.3`.
 
 commands:                        # ship runs these locally before opening a PR
   lint: "cp src/main.js /tmp/_gtacheck.mjs && node --check /tmp/_gtacheck.mjs"

@@ -16,9 +16,13 @@ Source of truth for the autonomous loop. A fresh `/ship` session resumes from th
 ## Board
 | id | title | phase | depends_on | status | attempts | PR |
 |----|-------|-------|-----------|--------|----------|----|
-| QA-001 | Race only pays out if the player actually raced | 1 | none | todo | 0 | — |
-| QA-002 | Enter prompt verb matches vehicle type (drive vs ride) | 1 | none | todo | 0 | — |
+| QA-001 | Race only pays out if the player actually raced | 1 | none | done | 3 | #2 |
+| QA-002 | Enter prompt verb matches vehicle type (drive vs ride) | 1 | none | done | 1 | #3 |
+| PROP-001 | GitHub Actions CI — lint + headless gameplay gate on PRs | 2 | none | todo | 0 | — |
 
 ## Activity log
 - 2026-07-01 — `.vibe/` scaffolded (autopilot, opencode+sonnet workers, headless gameplay gate). Awaiting first `/align`.
+- 2026-07-01 — Board emptied (QA-001/002 done) → `on_empty: propose`: queued PROP-001 (remote CI, validated gap). Gameplay proposals await user sign-off.
+- 2026-07-01 — QA-002 **done** (PR #3, merged). Worker xai/grok-4.3, single clean attempt. Gate: lint OK + gameplay OK.
+- 2026-07-01 — QA-001 **done** (PR #2, merged). Worker big-pickle failed 2× (opencode server errors err_4f50833b/err_3716fb04) → escalated to xai/grok-4.3, which produced a clean minimal fix. Gate: lint OK + gameplay OK. attempts=3.
 - 2026-07-01 — QA sweep (Opus): probed every system headless (boot, on-foot, weapons, talk, carjack/drive, wanted+police, vigilante; full code review of missions/economy/death). **Zero JS/engine-crash bugs — game is crash-robust.** Headless "crashes" were swiftshader GL deaths under simultaneous heavy load (test-env only, no JS error). Validated 2 real minor issues → QA-001 (race payout exploit), QA-002 (drive/ride wording). Dropped 2 false positives (foot-speedo km/h and knife-at-spawn are both intentional). Fixed test infra: gameplay gate now starts the real game via `__start` (was a no-op `KeyP`) and fail-fasts on browser death instead of hanging to timeout.
