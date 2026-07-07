@@ -2767,7 +2767,10 @@ function animate(){
             hit=true;break;}}
         if(hit)break;
         for(const a of aiCars)if(Math.hypot(a.mesh.position.x-bx,a.mesh.position.z-bz)<2){
-          sparks(a.mesh.position);a.base=Math.min(.95,a.base+.4);hit=true;break;}
+          sparks(a.mesh.position);a.base=Math.min(.95,a.base+.4);
+          const u=a.mesh.userData;u.hp=(u.hp??40)-b.dmg;const k=u.hp<=0;hitMark(k);hit=true;
+          if(k){explode(a.mesh.position);scene.remove(a.mesh);const idx=aiCars.indexOf(a);if(idx>=0)aiCars.splice(idx,1);if(crimeCool<=0){addWanted(a.police?2:1);crimeCool=2;}spawnAI();}
+          break;}
       }else{ // cop bullet
         if(Math.hypot(player.x-bx,player.z-bz)<(player.inCar?2:0.9)){
           hit=true;
