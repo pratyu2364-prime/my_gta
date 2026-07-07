@@ -2,8 +2,8 @@ id: COMBAT-003
 title: AI traffic takes bullet damage and can be destroyed
 phase: 5
 depends_on: COMBAT-002
-status: todo
-attempts: 0
+status: in_review
+attempts: 1
 acceptance:
  - Player bullets hitting an AI vehicle (bullet loop ~line 2773: `for(const a of aiCars)if(...<2){sparks...}`) now also subtract b.dmg from that vehicle's hp (`a.mesh.userData.hp`, already initialized by makeCar/makeBike/makeRickshaw — guard with a fallback of 40 if undefined).
  - The existing panic reaction stays (sparks + a.base speed-up).

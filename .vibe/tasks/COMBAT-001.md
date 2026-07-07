@@ -2,8 +2,8 @@ id: COMBAT-001
 title: Hitmarker + hit sound when player bullets connect
 phase: 5
 depends_on: none
-status: todo
-attempts: 0
+status: in_review
+attempts: 3
 acceptance:
  - When a PLAYER bullet hits a person (ped, gang member, foot cop, cop walker) or a cop cruiser, the on-screen crosshair `#xh` (src/main.js ~line 1284 toggles it) gives a brief hitmarker flash (~150ms): scale up + white tint, and RED tint when the hit is a kill/decap (downPed/decapPed/killGang/decapGang/cop removed/cruiser exploded).
  - A short percussive "hit" tick sound plays on connect (WebAudio, like gunSound ~line 1143 / chime ~line 1151); ALWAYS guard audio with if(actx) like existing sound helpers.

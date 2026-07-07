@@ -2,8 +2,8 @@ id: COMBAT-002
 title: Wanted escalation — 4-5 star response actually escalates
 phase: 5
 depends_on: COMBAT-001
-status: todo
-attempts: 0
+status: in_review
+attempts: 1
 acceptance:
  - Cruiser count scales with stars instead of the flat 4 cap. Replace `while(cops.length<wanted&&cops.length<4)spawnCop();` (src/main.js ~line 2791) with a cap of Math.min(wanted+1,6) so 5 stars fields 6 cruisers, 1 star still fields ~2.
  - At wanted>=4 foot cops fire faster: fire interval 1.4 -> 0.9s (footCopUpdate ~line 1798-1800); cop walkers likewise 0.7 -> 0.5 (~line 1696).
