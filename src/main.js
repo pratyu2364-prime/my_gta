@@ -1157,6 +1157,7 @@ function chime(){
     o.connect(g).connect(masterGain);o.start(actx.currentTime+i*.12);o.stop(actx.currentTime+i*.12+.35);
   });
 }
+function hitMark(kill){if(!actx)return;const s=actx.createBufferSource();s.buffer=noiseBuf;const g=actx.createGain();g.gain.setValueAtTime(.18,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.06);const hp=actx.createBiquadFilter();hp.type='highpass';hp.frequency.value=900;s.connect(hp).connect(g).connect(masterGain);s.start();s.stop(actx.currentTime+.07);const xh=document.getElementById('xh');if(xh){xh.style.transition='none';xh.style.transform=kill?'scale(2.2)':'scale(1.6)';xh.style.background=kill?'#f33':'#fff';setTimeout(()=>{if(xh){xh.style.transition='transform .12s,background .12s';xh.style.transform='scale(1)';xh.style.background='#fff';}},150);} }
 // dynamic synthesized speech ("simlish" formant blips) — no text, distance-attenuated.
 // seed shapes the intonation; kind 'talk' = casual, 'shout' = panic/aggro, 'gruff' = lower voice.
 function speak(seed,x,z,kind){
@@ -2732,34 +2733,31 @@ function animate(){
       if(Math.abs(bx)>WORLD||Math.abs(bz)>WORLD||pointInBuilding(bx,bz)){hit=true;break;}
       if(b.from==='player'){
         for(const p of peds)if(p.state!=='down'&&Math.hypot(p.x-bx,p.z-bz)<1.0){
-          if(by>1.6)decapPed(p);                              // head shot
-          else{p.hp-=b.dmg;if(p.hp<=0)downPed(p);else woundPed(p);}   // body shot wounds, then kills
-          if(crimeCool<=0){addWanted(1);crimeCool=2;}hit=true;break;}
+          const k=by>1.6||(p.hp-b.dmg<=0);if(by>1.6)decapPed(p);else{p.hp-=b.dmg;if(p.hp<=0)downPed(p);else woundPed(p);}
+          hitMark(k);if(crimeCool<=0){addWanted(1);crimeCool=2;}hit=true;break;}
         if(hit)break;
         for(const g of gangs){if(g.state==='dead')continue;
           if(Math.hypot(g.x-bx,g.z-bz)<1.1){
-            if(by>1.62){decapGang(g);hit=true;break;}          // head shot → decapitation
-            g.hp-=b.dmg;spawnBlood({x:g.x,z:g.z});
-            if(g.hp<=0)killGang(g);else{provokeGang(g);if(g.hp<60)g.wound=true;}hit=true;break;}}
+            const k=by>1.62||(g.hp-b.dmg<=0);if(by>1.62)decapGang(g);else{g.hp-=b.dmg;spawnBlood({x:g.x,z:g.z});if(g.hp<=0)killGang(g);else{provokeGang(g);if(g.hp<60)g.wound=true;}}hitMark(k);hit=true;break;}}
         if(hit)break;
         for(let ci=copWalkers.length-1;ci>=0;ci--){const cw=copWalkers[ci];
           if(Math.hypot(cw.x-bx,cw.z-bz)<1.1){
             if(by>1.6)decapFx(cw.x,cw.z,0xd9a173);
-            spawnBlood({x:cw.x,z:cw.z});scene.remove(cw.mesh);copWalkers.splice(ci,1);addWanted(2);hit=true;break;}}
+            spawnBlood({x:cw.x,z:cw.z});scene.remove(cw.mesh);copWalkers.splice(ci,1);addWanted(2);hitMark(true);hit=true;break;}}
         if(hit)break;
         for(let fi=footCops.length-1;fi>=0;fi--){
           const f=footCops[fi];
           if(Math.hypot(f.mesh.position.x-bx,f.mesh.position.z-bz)<1.1){
             if(by>1.6)decapFx(f.mesh.position.x,f.mesh.position.z,0xd9a173);
             spawnBlood(f.mesh.position);scene.remove(f.mesh);footCops.splice(fi,1);
-            addWanted(2);hit=true;break;}
+            addWanted(2);hitMark(true);hit=true;break;}
         }
         if(hit)break;
         for(let ci=cops.length-1;ci>=0;ci--){
           const c=cops[ci];
           if(Math.hypot(c.mesh.position.x-bx,c.mesh.position.z-bz)<2.2){
-            c.mesh.userData.hp-=b.dmg;sparks(c.mesh.position);hit=true;
-            if(c.mesh.userData.hp<=0){explode(c.mesh.position);scene.remove(c.mesh);cops.splice(ci,1);addWanted(1);}
+            c.mesh.userData.hp-=b.dmg;sparks(c.mesh.position);const k=c.mesh.userData.hp<=0;hitMark(k);hit=true;
+            if(k){explode(c.mesh.position);scene.remove(c.mesh);cops.splice(ci,1);addWanted(1);}
             break;}
         }
         if(hit)break;
