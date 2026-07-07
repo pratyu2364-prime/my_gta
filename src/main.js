@@ -1694,7 +1694,7 @@ function copWalkerUpdate(cw,dtF){
     m.rotation.y=ang;
     if(d>2.6){const pp={x:cw.x+Math.sin(ang)*.1*dtF,z:cw.z+Math.cos(ang)*.1*dtF,vx:0,vz:0};resolveCircle(pp,.5);resolveActors(pp,.5);cw.x=pp.x;cw.z=pp.z;
       cw.walk+=.22*dtF;const s=Math.sin(cw.walk*6);L[0].rotation.x=s*.6;L[1].rotation.x=-s*.6;}
-    if(wanted>=2){cw.fireT-=dtF/60;if(cw.fireT<=0&&d<28){cw.fireT=.7;shoot(cw.x+Math.sin(ang)*1.4,1.4,cw.z+Math.cos(ang)*1.4,ang+rnd(-.07,.07),'cop',10);}}
+    if(wanted>=2){cw.fireT-=dtF/60;if(cw.fireT<=0&&d<28){cw.fireT=wanted>=4?.5:.7;shoot(cw.x+Math.sin(ang)*1.4,1.4,cw.z+Math.cos(ang)*1.4,ang+rnd(-.07,.07),'cop',10);}}
     if(d<1.6&&Math.hypot(player.vx,player.vz)<.25&&!player.inCar){bustedNow();}
   }else{ // patrol wander
     if(Math.random()<.01)cw.wanderA+=rnd(-1,1);
@@ -1730,7 +1730,7 @@ function copUpdate(c,dtF){
   const pSpeed=Math.hypot(player.vx,player.vz);
   // pull over next to you instead of orbiting when you're slow
   if(d<8&&pSpeed<.35)vf*=Math.pow(.9,dtF);
-  else vf=Math.min(vf+.016*dtF,.95);
+  else vf=Math.min(vf+.016*dtF,wanted>=5?1.08:.95);
   vl*=Math.pow(.85,dtF);
   c.vx=fx*vf+fz*vl;c.vz=fz*vf-fx*vl;
   const pp={x:m.position.x+c.vx*dtF,z:m.position.z+c.vz*dtF,vx:c.vx,vz:c.vz};
@@ -1743,7 +1743,7 @@ function copUpdate(c,dtF){
   m.userData.beacons[0].material.emissiveIntensity=fln?2:.1;
   m.userData.beacons[1].material.emissiveIntensity=fln?.1:2;
   // officer steps out when you're cornered
-  if(!c.deployed&&d<11&&pSpeed<.3&&footCops.length<4){
+  if(!c.deployed&&d<11&&pSpeed<.3&&footCops.length<(wanted>=4?6:4)){
     c.deployed=true;
     spawnFootCop(m.position.x+fz*1.8,m.position.z-fx*1.8);
   }
@@ -1798,7 +1798,7 @@ function footCopUpdate(f,dtF){
   // at 2+ stars they open fire
   if(wanted>=2){
     f.t-=dtF/60;
-    if(f.t<=0&&d<26){f.t=1.4;shoot(m.position.x,1.3,m.position.z,ang+rnd(-.06,.06),'cop',9);}
+    if(f.t<=0&&d<26){f.t=wanted>=4?.9:1.4;shoot(m.position.x,1.3,m.position.z,ang+rnd(-.06,.06),'cop',9);}
   }
   return true;
 }
@@ -2786,7 +2786,7 @@ function animate(){
     wantedTimer-=dt;
     if(wantedTimer<=0){wanted--;wantedTimer=22;updateStars();
       if(wanted===0){clearCops();showMsg('You lost the heat');}}
-    while(cops.length<wanted&&cops.length<4)spawnCop();
+    while(cops.length<(wanted>=4?Math.min(wanted+1,6):wanted))spawnCop();   // 4-5★ field an extra cruiser (up to 6)
   }
   for(const c of cops)copUpdate(c,dtF);
   for(let i=footCops.length-1;i>=0;i--)if(!footCopUpdate(footCops[i],dtF))footCops.splice(i,1);
