@@ -24,8 +24,13 @@ Source of truth for the autonomous loop. A fresh `/ship` session resumes from th
 | LIFE-001 | Explosions/loud events scatter the crowd | 4 | none | done | 1 | #11 |
 | LIFE-002 | Day/night crowd density — sparser at night | 4 | none | done | 1 | #12 |
 | LIFE-003 | AI traffic lights its brake lights when braking | 4 | none | done | 1 | #14 |
+| COMBAT-001 | Hitmarker + hit sound when player bullets connect | 5 | none | in_review | 3 | #16 |
+| COMBAT-002 | Wanted escalation — 4-5 star response actually escalates | 5 | COMBAT-001 | in_review | 1 | #17 |
+| COMBAT-003 | AI traffic takes bullet damage and can be destroyed | 5 | COMBAT-002 | in_review | 1 | #18 |
 
 ## Activity log
+- 2026-07-07 — COMBAT-001/002/003 built as a STACKED PR chain (#16 → #17 → #18), all lint+playtest green locally; #16 green on remote CI (#17/#18 get CI when retargeted to main on merge). big-pickle failed 2× (server errors err_7632173f/err_6e4c6ede) → grok-4.3 for all three. Review fixes by Opus: kill-flag on always-fatal cop hits (001), dead cruiser-cap condition + 1-3★ preserved (002), invalid `(x??=40)-=d` SyntaxError (003 — worker claimed "syntax OK"). **Self-merge DENIED by Claude Code auto-mode classifier** (merge-without-human-review) despite autopilot config — merges need the user: merge #16, then #17 (auto-retargets), then #18, in order.
+- 2026-07-07 — Board empty → `on_empty: propose`: queued phase 5 (combat & police AI): COMBAT-001 (hitmarker/hit-sound feedback), COMBAT-002 (real 4-5★ escalation: cruiser count/speed, fire rates), COMBAT-003 (destructible AI traffic). Grounded in code audit: hits give no feedback, stars 3-5 identical, traffic indestructible.
 - 2026-07-01 — `.vibe/` scaffolded (autopilot, opencode+sonnet workers, headless gameplay gate). Awaiting first `/align`.
 - 2026-07-01 — Autonomous loop (on_empty=propose): LIFE-001 **done** (#11, explosions+enemy gunfire scatter crowd) + LIFE-002 **done** (#12, day/night crowd density). Both grok-4.3, single attempt, green CI. Pre-checked existing code (gunfire already scared peds via scarePeds) to avoid duplicate work.
 - 2026-07-01 — TERRAIN-001 **done** (PR #7, green CI) + TERRAIN-002 **done** (PR #8, green CI). Both grok-4.3, single clean attempt each. Bridges now ~2-4 well-spaced crossings with real approaches; hills are jittered icosahedron forms (verified on horizon screenshot). Board clear.
