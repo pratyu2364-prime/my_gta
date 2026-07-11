@@ -299,6 +299,9 @@ function buildLandmarkProps(type,cx,cz,hw,hd){
     const co=new THREE.MeshPhongMaterial({color:0xe67e22});
     for(let i=0;i<4;i++){const c=new THREE.Mesh(new THREE.ConeGeometry(.3,.8,8),co);c.position.set(cx-3+i*2,.4,cz+hd-2.5);scene.add(c);}
     const bd=new THREE.Mesh(new THREE.BoxGeometry(3,1.6,.2),new THREE.MeshPhongMaterial({color:0x16306e}));bd.position.set(cx,1.6,cz-hd+1);scene.add(bd);
+  }else if(type==='gunshop'){
+    const cm=new THREE.MeshPhongMaterial({color:0x333333});
+    for(let i=0;i<3;i++){const r=new THREE.Mesh(new THREE.BoxGeometry(1.2,1.8,3.5),cm);r.position.set(cx-hw+4+i*5,.9,cz);r.castShadow=true;scene.add(r);}
   }else{
     const umb=[0xe74c3c,0x27ae60,0x2980b9,0xf1c40f];
     for(let i=0;i<4;i++){const tx=cx-hw+5+(i%2)*6,tz=cz-hd+5+Math.floor(i/2)*6;
@@ -345,17 +348,18 @@ function buildLandmark(b,cfg){
   para.position.set(cx,wallH+.5,cz);scene.add(para);roof.userData.para=para;
   buildLandmarkProps(cfg.type,cx,cz,hw,hd);
   landmarks.push({type:cfg.type,name:cfg.name,x:cx,z:cz,hw,hd,roof,r:Math.min(hw,hd)-1,
-    color:cfg.type==='hospital'?'#e74c3c':cfg.type==='police'?'#2e6fff':'#e67e22'});
+    color:cfg.type==='hospital'?'#e74c3c':cfg.type==='police'?'#2e6fff':cfg.type==='food'?'#e67e22':'#f1c40f'});
 }
 {
   const LM=[{type:'hospital',name:'HOSPITAL',sign:'+ HOSPITAL',bg:'#ffffff',fg:'#d63031',floor:0xdfe6e9,wall:0xeef2f4,light:0xffeaea},
             {type:'police',name:'POLICE STATION',sign:'POLICE',bg:'#16306e',fg:'#ffffff',floor:0x3a4658,wall:0x5b6b80,light:0xdfe7ff},
-            {type:'food',name:'FOOD COURT',sign:'FOOD COURT',bg:'#e67e22',fg:'#ffffff',floor:0xe8d8b0,wall:0xb98a5a,light:0xfff1da}];
+            {type:'food',name:'FOOD COURT',sign:'FOOD COURT',bg:'#e67e22',fg:'#ffffff',floor:0xe8d8b0,wall:0xb98a5a,light:0xfff1da},
+            {type:'gunshop',name:'GUN SHOP',sign:'GUN SHOP',bg:'#111111',fg:'#f1c40f',floor:0x2c3e50,wall:0x555555,light:0xfff2cc}];
   const cand=blocks.filter(b=>!b.park&&!b.river&&(b.x1-b.x0)>30&&(b.z1-b.z0)>30).sort((a,b)=>a.d-b.d);
   const chosen=[];
-  for(let i=0;i<cand.length&&chosen.length<3;i++){const b=cand[i];
+  for(let i=0;i<cand.length&&chosen.length<4;i++){const b=cand[i];
     if(chosen.every(c=>Math.hypot(c.cx-b.cx,c.cz-b.cz)>95))chosen.push(b);}
-  for(let i=0;i<cand.length&&chosen.length<3;i++)if(!chosen.includes(cand[i]))chosen.push(cand[i]);
+  for(let i=0;i<cand.length&&chosen.length<4;i++)if(!chosen.includes(cand[i]))chosen.push(cand[i]);
   chosen.forEach((b,i)=>{b.special=true;buildLandmark(b,LM[i]);});
 }
 // reserve a clear building-free corridor (one block-row) for the elevated highway flyover,
@@ -1202,7 +1206,14 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyQ')cycleWeapon();
   if(e.code==='KeyE')pressedE=true;
   if(e.code==='KeyT')talkReq=true;
-  if(e.code==='Digit1')startTaxiJob();
+  const shopping=insideLM&&insideLM.type==='gunshop'&&!player.inCar;   // shop keys eat 1-4 so taxi doesn't start mid-purchase
+  if(e.code==='Digit1'&&!shopping)startTaxiJob();
+  if(shopping){
+    if(e.code==='Digit1')buyGun('pistol',400);
+    else if(e.code==='Digit2')buyGun('uzi',900);
+    else if(e.code==='Digit3')buyGun('shotgun',1200);
+    else if(e.code==='Digit4')buyAmmo(150);
+  }
 });
 addEventListener('keyup',e=>keys[e.code]=false);
 const canvasEl=renderer.domElement;
@@ -1288,6 +1299,22 @@ function giveWeapon(w){
   if(!owned.includes(w)){owned.push(w);curW=owned.length-1;}
   if(WEAPONS[w].melee)ammo[w]=Infinity;else ammo[w]=(ammo[w]||0)+WEAPONS[w].ammo0;
   chime();showMsg(w.toUpperCase()+' acquired!');weaponHUD();
+}
+function buyGun(w,price){
+  if(money<price){showMsg('Not enough cash');return;}
+  money-=price;
+  const had=owned.includes(w);
+  if(!had)owned.push(w);
+  if(!WEAPONS[w].melee)ammo[w]=WEAPONS[w].ammo0;
+  document.getElementById('money').textContent='$'+money;
+  chime();showMsg((had?'Refilled ':'Bought ')+w.toUpperCase());weaponHUD();
+}
+function buyAmmo(price){
+  const w=owned[curW];if(w==='fist'||!WEAPONS[w]){showMsg('No gun');return;}
+  if(money<price){showMsg('Not enough cash');return;}
+  money-=price;ammo[w]=WEAPONS[w].ammo0;
+  document.getElementById('money').textContent='$'+money;
+  chime();showMsg('Ammo refilled');weaponHUD();
 }
 // pickups
 const pickups=[];
@@ -2358,7 +2385,7 @@ function drawBlip(x,z,color,r){
   mm.arc((x+WORLD)*ms,(z+WORLD)*ms,r/1.15,0,7);mm.fill();
 }
 // labelled map symbols (used by both the minimap and the full map)
-const LM_COL={hospital:'#e74c3c',police:'#2e6fff',food:'#e67e22',airport:'#16a596'};
+  const LM_COL={hospital:'#e74c3c',police:'#2e6fff',food:'#e67e22',gunshop:'#f1c40f',airport:'#16a596'};
 function drawMapIcon(g,x,y,r,type){
   g.fillStyle=LM_COL[type]||'#888';g.strokeStyle='rgba(0,0,0,.75)';g.lineWidth=r*.2;
   g.beginPath();g.arc(x,y,r,0,7);g.fill();g.stroke();
@@ -2372,6 +2399,7 @@ function drawMapIcon(g,x,y,r,type){
     g.moveTo(x,y-r*.6);g.lineTo(x,y+r*.55);
     g.moveTo(x,y-r*.05);g.lineTo(x-r*.6,y+r*.22);g.moveTo(x,y-r*.05);g.lineTo(x+r*.6,y+r*.22);
     g.moveTo(x,y+r*.4);g.lineTo(x-r*.26,y+r*.6);g.moveTo(x,y+r*.4);g.lineTo(x+r*.26,y+r*.6);g.stroke();}
+  else if(type==='gunshop'){const a=r*.45;g.beginPath();g.moveTo(x-a,y-a*.6);g.lineTo(x+a*.6,y+a*.8);g.moveTo(x-a*.3,y-a*.2);g.lineTo(x+a*.3,y-a*.2);g.stroke();}
 }
 let healCool=0,insideLM=null,shake=0;
 function addShake(a){shake=Math.min(1.3,shake+a);}   // decaying camera kick on impacts
@@ -2386,6 +2414,9 @@ function checkLandmarks(dt){
       playerHp=Math.min(100,playerHp+24*dt);
       healCool-=dt;if(healCool<=0){healCool=2.6;showMsg(Lm.type==='hospital'?'Patched up at the hospital':'Tasty! Feeling better');}
     }
+  }
+  if(insideLM&&insideLM.type==='gunshop'&&!player.inCar){
+    const p=document.getElementById('prompt');p.innerHTML='1:Pistol $400  2:Uzi $900  3:Shotgun $1200  4:Ammo $150';p.style.opacity=1;
   }
 }
 function drawMinimap(){
