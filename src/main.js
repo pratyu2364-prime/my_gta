@@ -244,6 +244,10 @@ const ground=new THREE.Mesh(new THREE.PlaneGeometry(WORLD*2,WORLD*2),
 ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
 const mapCv=document.createElement('canvas');mapCv.width=mapCv.height=720;
 paintCity(mapCv.getContext('2d'),720,true);
+// rain: single Points, recycled box follows player
+const rainN=600;const rainGeo=new THREE.BufferGeometry();const rainPos=new Float32Array(rainN*3);
+for(let i=0;i<rainN;i++){rainPos[i*3]=rnd(-40,40);rainPos[i*3+1]=rnd(0,30);rainPos[i*3+2]=rnd(-40,40);}
+rainGeo.setAttribute('position',new THREE.BufferAttribute(rainPos,3));const rainMat=new THREE.PointsMaterial({color:0xaaaaff,size:.08,transparent:true,opacity:.6,sizeAttenuation:true});const rainPts=new THREE.Points(rainGeo,rainMat);rainPts.visible=false;scene.add(rainPts);
 
 // ---------- building materials ----------
 function buildingMat(base,glass,rows){
@@ -1271,7 +1275,7 @@ const inp=()=>({
 
 // ---------- game state ----------
 let money=500,wanted=0,crimeCool=0,wantedTimer=0,playerHp=100;
-let tod=.32;
+let tod=.32,rainF=0,rainT=0,rainPhase=0,rainDur=rnd(120,300);
 const player={x:spawnX+5,z:spawnZ-4,vx:0,vz:0,vy:0,y:0,climbV:0,heading:Math.PI/2,inCar:false,steer:0,airborne:false,meleeAnim:0,jumpHeld:false};
 const pdist=(x,z)=>Math.hypot(player.x-x,player.z-z);   // distance from the player to a world point (symmetric)
 const char=buildCharacter(0xe8b88f,0x223a5e,0x222831,0x2b1b0e,false);scene.add(char);char.position.set(player.x,0,player.z);
@@ -1418,7 +1422,8 @@ const CHEATS={
   VIGI:()=>startVigilante(),
   PEACE:()=>stopVigilante(),
   RACE:()=>startRace(),
-  COURIER:()=>startCourier()
+  COURIER:()=>startCourier(),
+  RAIN:()=>{rainPhase=1-rainPhase;rainT=0;rainF=rainPhase;rainDur=rainPhase?rnd(40,90):rnd(120,300);showMsg(rainPhase?'🌧 RAIN ON':'☀ RAIN OFF');}
 };
 addEventListener('keydown',e=>{
   if(!e.key||e.key.length!==1||!/[a-z]/i.test(e.key))return;
@@ -2521,6 +2526,10 @@ function animate(){
   if(!started||bigOpen||paused){renderFrame();return;}
   const k=inp();
   lightT+=dt;tod=(tod+dt/480)%1;
+  // rain state machine (clear↔rain, rand timers)
+  rainT+=dt;if(rainT>rainDur){rainPhase=1-rainPhase;rainT=0;rainDur=rainPhase?rnd(40,90):rnd(120,300);}rainF+=(rainPhase-rainF)*(rainPhase?.08:.05)*dtF;rainF=M.clamp(rainF,0,1);
+  if(rainPts){rainPts.visible=rainF>.02;const p=rainGeo.attributes.position.array;const cx=player.x,cz=player.z;for(let i=0;i<rainN;i++){let y=p[i*3+1]-=1.2*dtF;if(y<0){y=30+rnd(0,5);p[i*3]=cx+rnd(-40,40);p[i*3+2]=cz+rnd(-40,40);}p[i*3+1]=y;}rainGeo.attributes.position.needsUpdate=true;rainPts.position.set(cx,0,cz);}
+
 
   // --- player ---
   if(!dead){
@@ -2548,7 +2557,8 @@ function animate(){
       // speed-sensitive grip: whipping the wheel at speed breaks rear traction → progressive drift.
       // grip closer to 1 = more lateral velocity retained = more slide.
       const slide=Math.abs(player.steer)*Math.min(1,spd/.7);
-      const grip=k.hb?.965:M.lerp(H.gripLo,H.gripHi,slide);
+      const g0=k.hb?.965:M.lerp(H.gripLo,H.gripHi,slide);
+      const grip=g0+(1-g0)*rainF*.35;   // wet road: grip slides toward 1 (never past — >1 would amplify vl)
       player.heading+=player.steer*(k.hb?.055:H.turn)*Math.sign(vf)*Math.min(1,spd/.5)*dtF;
       if(k.hb)vf*=Math.pow(.985,dtF);
       vl*=Math.pow(grip,dtF);
@@ -2878,7 +2888,8 @@ function animate(){
   skyCol.copy(skyNight).lerp(skyDay,dayF);
   const sf=Math.max(0,.3-Math.abs(el))/.3*(el>-.1?1:0)*.55;
   skyCol.lerp(skySet,sf);
-  scene.background=skyCol;scene.fog.color.copy(skyCol);
+  if(rainF>0)skyCol.multiplyScalar(1-rainF*.45);scene.background=skyCol;scene.fog.color.copy(skyCol);
+  scene.fog.far=M.lerp(820,340,rainF);   // rain thickens fog (multiplies tod look, doesn't replace it)
   if(sky){ // drive the dome gradient + sun disk from the same day/night state
     skyTopCol.copy(skyTopNight).lerp(skyTopDay,dayF).lerp(skySet,sf*.5);
     sky.material.uniforms.top.value.copy(skyTopCol);
@@ -2888,13 +2899,13 @@ function animate(){
     sky.material.uniforms.sunCol.value.setRGB(1,.92,.74).multiplyScalar(.45+dayF*.7);
     sky.position.set(player.x,0,player.z);
   }
-  sun.intensity=Math.max(0,el)*1.15;
+  sun.intensity=Math.max(0,el)*1.15*(1-rainF*.4);
   // dynamic exposure: brighter at high noon, lifted at night so the city stays readable (cinematic depth)
   renderer.toneMappingExposure=.92+dayF*.26+(1-dayF)*.12;
-  hemi.intensity=.1+dayF*.34;     // env map now supplies ambient fill, so dial the hemisphere down
+  hemi.intensity=(.1+dayF*.34)*(1-rainF*.3);     // env map now supplies ambient fill, so dial the hemisphere down
   const night=1-dayF;
   // wet-asphalt look after dark: drop roughness & lift metalness/env reflectivity so the sky and streetlights mirror in the road
-  ground.material.roughness=M.lerp(.88,.42,night);
+  ground.material.color.setScalar(1-rainF*.35);ground.material.roughness=M.lerp(.88,.42,night);
   ground.material.metalness=M.lerp(.04,.34,night);
   ground.material.envMapIntensity=M.lerp(.25,.9,night);
   for(const m of bldMats)m.emissiveIntensity=night*.9;
