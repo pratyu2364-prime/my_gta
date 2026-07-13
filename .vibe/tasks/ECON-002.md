@@ -2,8 +2,8 @@ id: ECON-002
 title: Pay-N-Spray landmark — drive in to clear wanted + repaint/repair for cash
 phase: 6
 depends_on: none
-status: todo
-attempts: 0
+status: done
+attempts: 1
 acceptance:
  - A 4th landmark "PAY-N-SPRAY" is placed on its own special block like the existing 3 (hospital/police/food): built via the LM config array (~line 358) + buildLandmark, with sign, blip on minimap, and a doorway gap wide enough to drive a car through (widen the gap for this type only).
  - Driving INTO the landmark footprint while in a car (player.inCar, type 'car' or 'auto' — not bikes) with money >= 400 triggers the spray: money -= 400, wanted cleared (reuse the CLEAN path: wanted=0, wantedTimer=0, updateStars(), clearCops()), vehicle hp restored to full, and the car body repainted a random new color (body mesh is vehicle.children[0]; its material color + userData.paint).
