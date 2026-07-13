@@ -29,10 +29,11 @@ Source of truth for the autonomous loop. A fresh `/ship` session resumes from th
 | POLICE-001 | Wanted escalation tiers — police pressure scales with stars | 5 | none | done | 1 | #22 |
 | ECON-002 | Pay-N-Spray landmark — clear wanted + repaint/repair for cash | 6 | none | done | 1 | #23 |
 | LIFE-004 | Rain affects street life — crowd thins/hurries, traffic cautious | 6 | none | done | 1 | #24 |
-| MISSION-001 | Taxi fares — pick up peds, drive to marker for cash | 7 | none | todo | 0 | |
+| MISSION-001 | Taxi fares — pick up peds, drive to marker for cash | 7 | none | dropped | 2 | |
 | WEATHER-002 | Thunderstorm — lightning flashes + thunder in heavy rain | 7 | none | todo | 0 | |
 
 ## Activity log
+- 2026-07-14 — MISSION-001 **dropped**: game already has a full taxi career (passenger board anim, GPS route, taxi vehicles, Press-1 fares) — task was proposed without grounding; worker attempt 2 deleted the existing system, reverted. Lesson: grep before proposing.
 - 2026-07-14 — Board empty → on_empty: propose (user continued loop): queued phase-7 MISSION-001 (taxi fares, modeled on courier ~2053) + WEATHER-002 (lightning/thunder on rainF>.8). Drive-by idea dropped — in-car shooting already exists (~2748).
 - 2026-07-14 — LIFE-004 **done** (PR #24, green CI, merged). grok-4.3 exact-to-spec 3-line diff. Phase-6 batch complete; board clear.
 - 2026-07-14 — ECON-002 **done** (PR #23, green CI, merged). grok-4.3; Opus review caught worker REPLACING the ECON-001 gun shop LM (restored, selection 4→5 blocks) + Lm.userData TypeError.

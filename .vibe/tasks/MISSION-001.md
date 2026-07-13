@@ -2,8 +2,8 @@ id: MISSION-001
 title: Taxi fares — pick up waiting peds, drive them to a marker for cash
 phase: 7
 depends_on: none
-status: todo
-attempts: 0
+status: dropped
+attempts: 2
 acceptance:
  - New TAXI cheat starts taxi mode (like RACE/COURIER, CHEATS map ~1423); requires being in a car or auto, else shows a message and does not start.
  - Taxi mode: a fare ped is highlighted with the existing marker style (see courier.marker) at a random sidewalk spot 60-150u away; drive within 6u and stop (speed <.15) → ped "boards" (despawn/recycle the ped record in place, never splice peds[]), then a destination marker appears 80-200u away.
