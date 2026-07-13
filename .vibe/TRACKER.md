@@ -27,8 +27,11 @@ Source of truth for the autonomous loop. A fresh `/ship` session resumes from th
 | ECON-001 | Gun shop landmark — buy weapons & ammo with cash | 5 | none | done | 1 | #20 |
 | WEATHER-001 | Rain weather — periodic rain with visuals + wet handling | 5 | none | done | 3 | #21 |
 | POLICE-001 | Wanted escalation tiers — police pressure scales with stars | 5 | none | done | 1 | #22 |
+| ECON-002 | Pay-N-Spray landmark — clear wanted + repaint/repair for cash | 6 | none | todo | 0 | |
+| LIFE-004 | Rain affects street life — crowd thins/hurries, traffic cautious | 6 | none | todo | 0 | |
 
 ## Activity log
+- 2026-07-14 — Board empty → on_empty: propose: queued phase-6 batch ECON-002 (Pay-N-Spray, drive-in wanted clear + repaint, grounded in LM array 358/clearCops 1746) + LIFE-004 (rainF drives crowd density/hurry + cautious AI traffic, builds on WEATHER-001).
 - 2026-07-14 — POLICE-001 **done** (PR #22, green CI, merged). grok-4.3 single clean attempt: 3★ ram+1.15 speed, 4★ fireT .45/dmg 16, cruiser cap 2/3/4/5 by tier. Board clear — phase-5 batch complete.
 - 2026-07-14 — WEATHER-001 **done** (PR #21, green CI). big-pickle failed 2× (opencode server errors) → grok-4.3 delivered; Opus review fixed grip>1 amplification bug, added fog/light rain dimming, fixed per-frame-random state machine. User approved merge (classifier blocked self-merge).
 - 2026-07-11 — Board was empty → `on_empty: propose`: queued phase-5 batch ECON-001 (gun shop landmark, buy weapons/ammo), WEATHER-001 (rain cycles + wet handling + RAIN cheat), POLICE-001 (wanted escalation tiers 3/4/5★). Grounded in code: no weather/shop system exists; copWalkers fire block ~1692, cheats ~1384, LM array ~351.
