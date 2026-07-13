@@ -319,7 +319,7 @@ function buildLandmarkProps(type,cx,cz,hw,hd){
 function buildLandmark(b,cfg){
   const cx=b.cx,cz=b.cz;
   const hw=Math.min((b.x1-b.x0)/2-1,20),hd=Math.min((b.z1-b.z0)/2-1,20);
-  const wallH=5,GAP=7,TH=.6;
+  const wallH=5,GAP=cfg.type==='paynspray'?12:7,TH=.6;
   const wallMat=new THREE.MeshPhongMaterial({color:cfg.wall,shininess:8});
   const fl=new THREE.Mesh(new THREE.BoxGeometry(2*hw,.2,2*hd),new THREE.MeshPhongMaterial({color:cfg.floor,shininess:6}));
   fl.position.set(cx,.11,cz);fl.receiveShadow=true;scene.add(fl);
@@ -352,18 +352,19 @@ function buildLandmark(b,cfg){
   para.position.set(cx,wallH+.5,cz);scene.add(para);roof.userData.para=para;
   buildLandmarkProps(cfg.type,cx,cz,hw,hd);
   landmarks.push({type:cfg.type,name:cfg.name,x:cx,z:cz,hw,hd,roof,r:Math.min(hw,hd)-1,
-    color:cfg.type==='hospital'?'#e74c3c':cfg.type==='police'?'#2e6fff':cfg.type==='food'?'#e67e22':'#f1c40f'});
+    color:cfg.type==='hospital'?'#e74c3c':cfg.type==='police'?'#2e6fff':cfg.type==='food'?'#e67e22':cfg.type==='paynspray'?'#27ae60':'#f1c40f'});
 }
 {
   const LM=[{type:'hospital',name:'HOSPITAL',sign:'+ HOSPITAL',bg:'#ffffff',fg:'#d63031',floor:0xdfe6e9,wall:0xeef2f4,light:0xffeaea},
             {type:'police',name:'POLICE STATION',sign:'POLICE',bg:'#16306e',fg:'#ffffff',floor:0x3a4658,wall:0x5b6b80,light:0xdfe7ff},
             {type:'food',name:'FOOD COURT',sign:'FOOD COURT',bg:'#e67e22',fg:'#ffffff',floor:0xe8d8b0,wall:0xb98a5a,light:0xfff1da},
-            {type:'gunshop',name:'GUN SHOP',sign:'GUN SHOP',bg:'#111111',fg:'#f1c40f',floor:0x2c3e50,wall:0x555555,light:0xfff2cc}];
+            {type:'gunshop',name:'GUN SHOP',sign:'GUN SHOP',bg:'#111111',fg:'#f1c40f',floor:0x2c3e50,wall:0x555555,light:0xfff2cc},
+            {type:'paynspray',name:'PAY-N-SPRAY',sign:'PAY N SPRAY',bg:'#27ae60',fg:'#ffffff',floor:0xd5f5e3,wall:0x58d68d,light:0xd5f5e3}];
   const cand=blocks.filter(b=>!b.park&&!b.river&&(b.x1-b.x0)>30&&(b.z1-b.z0)>30).sort((a,b)=>a.d-b.d);
   const chosen=[];
-  for(let i=0;i<cand.length&&chosen.length<4;i++){const b=cand[i];
+  for(let i=0;i<cand.length&&chosen.length<5;i++){const b=cand[i];
     if(chosen.every(c=>Math.hypot(c.cx-b.cx,c.cz-b.cz)>95))chosen.push(b);}
-  for(let i=0;i<cand.length&&chosen.length<4;i++)if(!chosen.includes(cand[i]))chosen.push(cand[i]);
+  for(let i=0;i<cand.length&&chosen.length<5;i++)if(!chosen.includes(cand[i]))chosen.push(cand[i]);
   chosen.forEach((b,i)=>{b.special=true;buildLandmark(b,LM[i]);});
 }
 // reserve a clear building-free corridor (one block-row) for the elevated highway flyover,
@@ -2407,18 +2408,26 @@ function drawMapIcon(g,x,y,r,type){
     g.moveTo(x,y+r*.4);g.lineTo(x-r*.26,y+r*.6);g.moveTo(x,y+r*.4);g.lineTo(x+r*.26,y+r*.6);g.stroke();}
   else if(type==='gunshop'){const a=r*.45;g.beginPath();g.moveTo(x-a,y-a*.6);g.lineTo(x+a*.6,y+a*.8);g.moveTo(x-a*.3,y-a*.2);g.lineTo(x+a*.3,y-a*.2);g.stroke();}
 }
-let healCool=0,insideLM=null,shake=0;
+let healCool=0,sprayT=0,insideLM=null,shake=0;
 function addShake(a){shake=Math.min(1.3,shake+a);}   // decaying camera kick on impacts
 function checkLandmarks(dt){
   insideLM=null;
   const onFoot=!player.inCar;
   for(const Lm of landmarks){
-    const inside=onFoot&&Math.abs(player.x-Lm.x)<Lm.hw-.3&&Math.abs(player.z-Lm.z)<Lm.hd-.3;
-    if(inside)insideLM=Lm;
+    const inside=(onFoot||Lm.type==='paynspray')&&Math.abs(player.x-Lm.x)<Lm.hw-.3&&Math.abs(player.z-Lm.z)<Lm.hd-.3;
+    if(inside)insideLM=Lm;else Lm.rej=false;
     Lm.roof.visible=!inside;Lm.roof.userData.para.visible=!inside;
     if(inside&&(Lm.type==='hospital'||Lm.type==='food')&&playerHp<100){
       playerHp=Math.min(100,playerHp+24*dt);
       healCool-=dt;if(healCool<=0){healCool=2.6;showMsg(Lm.type==='hospital'?'Patched up at the hospital':'Tasty! Feeling better');}
+    }
+    if(inside&&Lm.type==='paynspray'&&player.inCar&&vehicle&&(vehicle.userData.type==='car'||vehicle.userData.type==='auto')){
+      if(money<400){if(!Lm.rej){Lm.rej=true;showMsg('Need $400');}}else if(sprayT<=0){Lm.rej=false;
+        money-=400;wanted=0;wantedTimer=0;updateStars();clearCops();vehicle.userData.hp=100;
+        const body=vehicle.children[0],cols=[0x3498db,0xe74c3c,0x2ecc71,0xf1c40f,0x9b59b6],nc=cols[Math.random()*5|0];
+        body.material.color.setHex(nc);vehicle.userData.paint=nc;sprayT=10;showMsg('Spraying…');
+        setTimeout(()=>showMsg('🎨 Sprayed! Heat lost'),1500);
+      }
     }
   }
   if(insideLM&&insideLM.type==='gunshop'&&!player.inCar){
@@ -2533,7 +2542,8 @@ function animate(){
 
 
   // --- player ---
-  if(!dead){
+  sprayT=Math.max(0,sprayT-dt);
+  if(!dead&&sprayT<=8){
     if(player.inCar&&(!vehicle||vehicle.userData.dead)){player.inCar=false;vehicle=null;}   // orphaned in-car flag → drop back to on foot
     if(!player.inCar&&!jack&&char.parent!==scene){scene.add(char);char.scale.setScalar(1);char.visible=true;}   // hard safety: on foot the avatar is ALWAYS in the scene & visible
     {const sig=money+'|'+owned.join(',')+'|'+JSON.stringify(ammo);if(sig!==saveSig){saveSig=sig;saveProgress({money,owned:owned.slice(),ammo:Object.assign({},ammo)});}}   // progression auto-save: only on change (debounced ~1s in core/save.js)
