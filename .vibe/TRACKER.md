@@ -29,8 +29,11 @@ Source of truth for the autonomous loop. A fresh `/ship` session resumes from th
 | POLICE-001 | Wanted escalation tiers — police pressure scales with stars | 5 | none | done | 1 | #22 |
 | ECON-002 | Pay-N-Spray landmark — clear wanted + repaint/repair for cash | 6 | none | done | 1 | #23 |
 | LIFE-004 | Rain affects street life — crowd thins/hurries, traffic cautious | 6 | none | done | 1 | #24 |
+| MISSION-001 | Taxi fares — pick up peds, drive to marker for cash | 7 | none | todo | 0 | |
+| WEATHER-002 | Thunderstorm — lightning flashes + thunder in heavy rain | 7 | none | todo | 0 | |
 
 ## Activity log
+- 2026-07-14 — Board empty → on_empty: propose (user continued loop): queued phase-7 MISSION-001 (taxi fares, modeled on courier ~2053) + WEATHER-002 (lightning/thunder on rainF>.8). Drive-by idea dropped — in-car shooting already exists (~2748).
 - 2026-07-14 — LIFE-004 **done** (PR #24, green CI, merged). grok-4.3 exact-to-spec 3-line diff. Phase-6 batch complete; board clear.
 - 2026-07-14 — ECON-002 **done** (PR #23, green CI, merged). grok-4.3; Opus review caught worker REPLACING the ECON-001 gun shop LM (restored, selection 4→5 blocks) + Lm.userData TypeError.
 - 2026-07-14 — Board empty → on_empty: propose: queued phase-6 batch ECON-002 (Pay-N-Spray, drive-in wanted clear + repaint, grounded in LM array 358/clearCops 1746) + LIFE-004 (rainF drives crowd density/hurry + cautious AI traffic, builds on WEATHER-001).
