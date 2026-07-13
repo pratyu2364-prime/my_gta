@@ -1725,7 +1725,7 @@ function copWalkerUpdate(cw,dtF){
     m.rotation.y=ang;
     if(d>2.6){const pp={x:cw.x+Math.sin(ang)*.1*dtF,z:cw.z+Math.cos(ang)*.1*dtF,vx:0,vz:0};resolveCircle(pp,.5);resolveActors(pp,.5);cw.x=pp.x;cw.z=pp.z;
       cw.walk+=.22*dtF;const s=Math.sin(cw.walk*6);L[0].rotation.x=s*.6;L[1].rotation.x=-s*.6;}
-    if(wanted>=2){cw.fireT-=dtF/60;if(cw.fireT<=0&&d<28){cw.fireT=.7;shoot(cw.x+Math.sin(ang)*1.4,1.4,cw.z+Math.cos(ang)*1.4,ang+rnd(-.07,.07),'cop',10);}}
+    if(wanted>=2){cw.fireT-=dtF/60;if(cw.fireT<=0&&d<28){cw.fireT=wanted>=4?.45:.7;shoot(cw.x+Math.sin(ang)*1.4,1.4,cw.z+Math.cos(ang)*1.4,ang+rnd(-.07,.07),'cop',wanted>=4?16:10);}}
     if(d<1.6&&Math.hypot(player.vx,player.vz)<.25&&!player.inCar){bustedNow();}
   }else{ // patrol wander
     if(Math.random()<.01)cw.wanderA+=rnd(-1,1);
@@ -1759,9 +1759,10 @@ function copUpdate(c,dtF){
   let vf=c.vx*fx+c.vz*fz,vl=c.vx*fz-c.vz*fx;
   const d=Math.hypot(player.x-m.position.x,player.z-m.position.z);
   const pSpeed=Math.hypot(player.vx,player.vz);
+  if(wanted>=3&&vehicle&&player.inCar){const dx=vehicle.position.x-m.position.x,dz=vehicle.position.z-m.position.z,dd=Math.hypot(dx,dz);if(dd<12){const want=Math.atan2(dx,dz);let dA=want-c.heading;while(dA>Math.PI)dA-=2*Math.PI;while(dA<-Math.PI)dA+=2*Math.PI;c.heading+=M.clamp(dA,-.08*dtF,.08*dtF);vf=Math.min(vf+.03*dtF,1.2);}}
   // pull over next to you instead of orbiting when you're slow
   if(d<8&&pSpeed<.35)vf*=Math.pow(.9,dtF);
-  else vf=Math.min(vf+.016*dtF,.95);
+  else vf=Math.min(vf+.016*dtF,wanted>=3?1.15:.95);
   vl*=Math.pow(.85,dtF);
   c.vx=fx*vf+fz*vl;c.vz=fz*vf-fx*vl;
   const pp={x:m.position.x+c.vx*dtF,z:m.position.z+c.vz*dtF,vx:c.vx,vz:c.vz};
@@ -1829,7 +1830,7 @@ function footCopUpdate(f,dtF){
   // at 2+ stars they open fire
   if(wanted>=2){
     f.t-=dtF/60;
-    if(f.t<=0&&d<26){f.t=1.4;shoot(m.position.x,1.3,m.position.z,ang+rnd(-.06,.06),'cop',9);}
+    if(f.t<=0&&d<26){f.t=wanted>=4?.45:1.4;shoot(m.position.x,1.3,m.position.z,ang+rnd(-.06,.06),'cop',wanted>=4?16:9);}
   }
   return true;
 }
@@ -2829,7 +2830,7 @@ function animate(){
     wantedTimer-=dt;
     if(wantedTimer<=0){wanted--;wantedTimer=22;updateStars();
       if(wanted===0){clearCops();showMsg('You lost the heat');}}
-    while(cops.length<wanted&&cops.length<4)spawnCop();
+    const cap=wanted>=5?5:wanted>=4?4:wanted>=3?3:2;while(cops.length<wanted&&cops.length<cap)spawnCop();
   }
   for(const c of cops)copUpdate(c,dtF);
   for(let i=footCops.length-1;i>=0;i--)if(!footCopUpdate(footCops[i],dtF))footCops.splice(i,1);
