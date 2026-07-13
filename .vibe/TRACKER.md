@@ -31,8 +31,11 @@ Source of truth for the autonomous loop. A fresh `/ship` session resumes from th
 | LIFE-004 | Rain affects street life — crowd thins/hurries, traffic cautious | 6 | none | done | 1 | #24 |
 | MISSION-001 | Taxi fares — pick up peds, drive to marker for cash | 7 | none | dropped | 2 | |
 | WEATHER-002 | Thunderstorm — lightning flashes + thunder in heavy rain | 7 | none | done | 1 | #25 |
+| AUDIO-001 | Car radio — procedural synth stations, R to cycle | 8 | none | todo | 0 | |
+| STUNT-001 | Stunt air bonuses — cash for big vehicle air time | 8 | none | todo | 0 | |
 
 ## Activity log
+- 2026-07-14 — on_empty: propose (grep-grounded this time): queued phase-8 AUDIO-001 (procedural radio stations, R cycles; verified NO radio/music exists) + STUNT-001 (air-time cash bonus; flyover ramps exist ~592, no stunt reward exists).
 - 2026-07-14 — WEATHER-002 **done** (PR #25, green CI, merged). grok-4.3 clean attempt: lightning flash factor into sky/hemi, lowpassed-noise thunder with delay, all guarded. Phase-7 closed (MISSION-001 dropped as duplicate). Board clear.
 - 2026-07-14 — MISSION-001 **dropped**: game already has a full taxi career (passenger board anim, GPS route, taxi vehicles, Press-1 fares) — task was proposed without grounding; worker attempt 2 deleted the existing system, reverted. Lesson: grep before proposing.
 - 2026-07-14 — Board empty → on_empty: propose (user continued loop): queued phase-7 MISSION-001 (taxi fares, modeled on courier ~2053) + WEATHER-002 (lightning/thunder on rainF>.8). Drive-by idea dropped — in-car shooting already exists (~2748).
