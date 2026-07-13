@@ -1276,7 +1276,7 @@ const inp=()=>({
 
 // ---------- game state ----------
 let money=500,wanted=0,crimeCool=0,wantedTimer=0,playerHp=100;
-let tod=.32,rainF=0,rainT=0,rainPhase=0,rainDur=rnd(120,300);
+let tod=.32,rainF=0,rainT=0,rainPhase=0,rainDur=rnd(120,300),flash=0,strikeT=0,strikeDur=rnd(8,25);
 const player={x:spawnX+5,z:spawnZ-4,vx:0,vz:0,vy:0,y:0,climbV:0,heading:Math.PI/2,inCar:false,steer:0,airborne:false,meleeAnim:0,jumpHeld:false};
 const pdist=(x,z)=>Math.hypot(player.x-x,player.z-z);   // distance from the player to a world point (symmetric)
 const char=buildCharacter(0xe8b88f,0x223a5e,0x222831,0x2b1b0e,false);scene.add(char);char.position.set(player.x,0,player.z);
@@ -2526,7 +2526,7 @@ if(DEBUG)window.__pause=v=>setPaused(v);   // test hook (headless never acquires
  $('pQuit').addEventListener('click',()=>{paused=false;$('pause').style.display='none';started=false;$('intro').style.display='flex';if(hasSave())$('mContinue').disabled=false;});}
 const skyDay=new THREE.Color(0x87ceeb),skyNight=new THREE.Color(0x0b1026),skySet=new THREE.Color(0xff8c5a);
 const skyTopDay=new THREE.Color(0x2f6fb0),skyTopNight=new THREE.Color(0x04060d);
-const skyCol=new THREE.Color(),skyTopCol=new THREE.Color(),_sunDir=new THREE.Vector3();
+const skyCol=new THREE.Color(),skyTopCol=new THREE.Color(),_sunDir=new THREE.Vector3(),white=new THREE.Color(0xffffff);
 weaponHUD();
 
 function animate(){
@@ -2539,6 +2539,7 @@ function animate(){
   // rain state machine (clear↔rain, rand timers)
   rainT+=dt;if(rainT>rainDur){rainPhase=1-rainPhase;rainT=0;rainDur=rainPhase?rnd(40,90):rnd(120,300);}rainF+=(rainPhase-rainF)*(rainPhase?.08:.05)*dtF;rainF=M.clamp(rainF,0,1);
   if(rainPts){rainPts.visible=rainF>.02;const p=rainGeo.attributes.position.array;const cx=player.x,cz=player.z;for(let i=0;i<rainN;i++){let y=p[i*3+1]-=1.2*dtF;if(y<0){y=30+rnd(0,5);p[i*3]=cx+rnd(-40,40);p[i*3+2]=cz+rnd(-40,40);}p[i*3+1]=y;}rainGeo.attributes.position.needsUpdate=true;rainPts.position.set(cx,0,cz);}
+  if(rainF>.8){strikeT+=dt;if(strikeT>strikeDur){flash=1;strikeT=0;strikeDur=rnd(8,25);if(actx&&eng.g)setTimeout(()=>{if(!actx)return;const s=actx.createBufferSource();s.buffer=noiseBuf;const g=actx.createGain();g.gain.value=.35;const lp=actx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=160;g.gain.linearRampToValueAtTime(.001,actx.currentTime+1.5);s.connect(lp).connect(g).connect(masterGain);s.start();s.stop(actx.currentTime+1.8);},400+rnd(100,1800));}}flash*=Math.pow(.75,dtF);
 
 
   // --- player ---
@@ -2899,7 +2900,7 @@ function animate(){
   skyCol.copy(skyNight).lerp(skyDay,dayF);
   const sf=Math.max(0,.3-Math.abs(el))/.3*(el>-.1?1:0)*.55;
   skyCol.lerp(skySet,sf);
-  if(rainF>0)skyCol.multiplyScalar(1-rainF*.45);scene.background=skyCol;scene.fog.color.copy(skyCol);
+  if(rainF>0)skyCol.multiplyScalar(1-rainF*.45);skyCol.lerp(white,flash);scene.background=skyCol;scene.fog.color.copy(skyCol);
   scene.fog.far=M.lerp(820,340,rainF);   // rain thickens fog (multiplies tod look, doesn't replace it)
   if(sky){ // drive the dome gradient + sun disk from the same day/night state
     skyTopCol.copy(skyTopNight).lerp(skyTopDay,dayF).lerp(skySet,sf*.5);
@@ -2913,7 +2914,7 @@ function animate(){
   sun.intensity=Math.max(0,el)*1.15*(1-rainF*.4);
   // dynamic exposure: brighter at high noon, lifted at night so the city stays readable (cinematic depth)
   renderer.toneMappingExposure=.92+dayF*.26+(1-dayF)*.12;
-  hemi.intensity=(.1+dayF*.34)*(1-rainF*.3);     // env map now supplies ambient fill, so dial the hemisphere down
+  hemi.intensity=Math.min(1,(.1+dayF*.34)*(1-rainF*.3)*(1+flash*3));
   const night=1-dayF;
   // wet-asphalt look after dark: drop roughness & lift metalness/env reflectivity so the sky and streetlights mirror in the road
   ground.material.color.setScalar(1-rainF*.35);ground.material.roughness=M.lerp(.88,.42,night);
