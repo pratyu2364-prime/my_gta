@@ -2,8 +2,8 @@ id: POLICE-001
 title: Wanted escalation tiers — police pressure scales with stars
 phase: 5
 depends_on: none
-status: todo
-attempts: 0
+status: done
+attempts: 1
 acceptance:
  - Behaviour at 0-2 stars is unchanged from today (regression guard — current chase/arrest/deploy logic stays as-is at low wanted).
  - At 3+ stars pursuing cruisers get aggressive: higher pursuit top speed and they actively steer to ram the player's vehicle (contact should feel like a hit — reuse existing collision/damage path, no new damage system).
