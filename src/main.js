@@ -1094,7 +1094,7 @@ function _rigid(mesh,i,off){_W.multiplyMatrices(_R,off);mesh.setMatrixAt(i,_W);}
 function _limb(mesh,i,joint,swing){_Rx.makeRotationX(swing);_J.multiplyMatrices(joint,_Rx);_W.multiplyMatrices(_R,_J);mesh.setMatrixAt(i,_W);}
 function updateCrowd(){
   const dayF=M.smoothstep(Math.sin((tod-.25)*Math.PI*2),-.18,.42);
-  const tgt=Math.round((0.4+0.6*dayF)*peds.length);
+  const tgt=Math.round((0.4+0.6*dayF)*(1-rainF*.6)*peds.length);
   crowdActive+=M.clamp(tgt-crowdActive,-2,2);
   for(let i=0;i<peds.length;i++){
     if(i>=crowdActive){for(const m of CROWD)m.setMatrixAt(i,_zero);continue;}
@@ -1555,7 +1555,7 @@ function aiUpdate(ai,dtF){
   let panic=1;ai.panic=false;
   if(!ai.police&&wanted>=2){const pd=pdist(m.position.x,m.position.z);
     if(pd<48){panic=1.6;ai.panic=true;}}
-  let target=ai.jacked?0:ai.base*panic;
+  let target=ai.jacked?0:ai.base*panic*(1-rainF*.2);
   if(next!==null){
     const dist=(next-pos)*ai.dir-HALF-2;
     const st=lightState(ai.axis);
@@ -1680,7 +1680,7 @@ function pedUpdate(p,dtF){
     resolveCircle(pp,.4);p.x=pp.x;p.z=pp.z;p.heading=ang;p.t+=(p.wounded?.25:.4)*dtF;
     if(p.timer<=0){p.state='walk';p.pos=p.axis==='z'?p.z:p.x;p.off=(p.axis==='z'?p.x:p.z)-p.line.c;}
   }else{
-    p.pos+=p.dir*p.speed*dtF;p.t+=.18*dtF;
+    const r=1+rainF*.5;p.pos+=p.dir*p.speed*r*dtF;p.t+=.18*r*dtF;
     if(p.pos>p.line.b-8||p.pos<p.line.a+8)p.dir*=-1;
     if(p.axis==='z'){p.x=p.line.c+p.off;p.z=p.pos;p.heading=p.dir>0?0:Math.PI;}
     else{p.x=p.pos;p.z=p.line.c+p.off;p.heading=p.dir>0?Math.PI/2:-Math.PI/2;}
