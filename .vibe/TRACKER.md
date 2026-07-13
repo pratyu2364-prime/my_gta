@@ -28,9 +28,10 @@ Source of truth for the autonomous loop. A fresh `/ship` session resumes from th
 | WEATHER-001 | Rain weather — periodic rain with visuals + wet handling | 5 | none | done | 3 | #21 |
 | POLICE-001 | Wanted escalation tiers — police pressure scales with stars | 5 | none | done | 1 | #22 |
 | ECON-002 | Pay-N-Spray landmark — clear wanted + repaint/repair for cash | 6 | none | done | 1 | #23 |
-| LIFE-004 | Rain affects street life — crowd thins/hurries, traffic cautious | 6 | none | todo | 0 | |
+| LIFE-004 | Rain affects street life — crowd thins/hurries, traffic cautious | 6 | none | done | 1 | #24 |
 
 ## Activity log
+- 2026-07-14 — LIFE-004 **done** (PR #24, green CI, merged). grok-4.3 exact-to-spec 3-line diff. Phase-6 batch complete; board clear.
 - 2026-07-14 — ECON-002 **done** (PR #23, green CI, merged). grok-4.3; Opus review caught worker REPLACING the ECON-001 gun shop LM (restored, selection 4→5 blocks) + Lm.userData TypeError.
 - 2026-07-14 — Board empty → on_empty: propose: queued phase-6 batch ECON-002 (Pay-N-Spray, drive-in wanted clear + repaint, grounded in LM array 358/clearCops 1746) + LIFE-004 (rainF drives crowd density/hurry + cautious AI traffic, builds on WEATHER-001).
 - 2026-07-14 — POLICE-001 **done** (PR #22, green CI, merged). grok-4.3 single clean attempt: 3★ ram+1.15 speed, 4★ fireT .45/dmg 16, cruiser cap 2/3/4/5 by tier. Board clear — phase-5 batch complete.

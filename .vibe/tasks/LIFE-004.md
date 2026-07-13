@@ -2,8 +2,8 @@ id: LIFE-004
 title: Rain affects street life — crowd thins and hurries, traffic cautious
 phase: 6
 depends_on: none
-status: todo
-attempts: 0
+status: done
+attempts: 1
 acceptance:
  - While raining (rainF from WEATHER-001), the wandering crowd target density scales down by up to ~60% at full rain (multiply the existing crowd target `tgt` ~line 1097 by (1-rainF*.6)) — smooth, no pops, recovers when rain ends.
  - Remaining walking peds hurry in rain: walk speed and swing-anim rate scale up ~1.5x with rainF (walking peds only — talk/down/flee states untouched).
