@@ -2,8 +2,8 @@ id: WEATHER-001
 title: Rain weather — periodic rain with visuals + wet handling
 phase: 5
 depends_on: none
-status: todo
-attempts: 0
+status: done
+attempts: 3
 acceptance:
  - A weather state machine cycles clear → rain → clear on randomized timers (rain roughly every 2-5 min, lasting 40-90s), independent of time-of-day.
  - During rain: visible falling rain streaks around the camera (ONE THREE.Points or LineSegments object, ~400-800 particles recycled in a box that follows the player — no per-frame allocation), sky/ambient dimmed and fog thickened versus the current tod-driven values, and a subtle wet-road look (darker ground or lowered ground material brightness) — all fully reverting when rain ends (smooth fade in/out, no pop).

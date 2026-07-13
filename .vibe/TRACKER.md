@@ -25,10 +25,11 @@ Source of truth for the autonomous loop. A fresh `/ship` session resumes from th
 | LIFE-002 | Day/night crowd density — sparser at night | 4 | none | done | 1 | #12 |
 | LIFE-003 | AI traffic lights its brake lights when braking | 4 | none | done | 1 | #14 |
 | ECON-001 | Gun shop landmark — buy weapons & ammo with cash | 5 | none | done | 1 | #20 |
-| WEATHER-001 | Rain weather — periodic rain with visuals + wet handling | 5 | none | todo | 0 | |
+| WEATHER-001 | Rain weather — periodic rain with visuals + wet handling | 5 | none | done | 3 | #21 |
 | POLICE-001 | Wanted escalation tiers — police pressure scales with stars | 5 | none | todo | 0 | |
 
 ## Activity log
+- 2026-07-14 — WEATHER-001 **done** (PR #21, green CI). big-pickle failed 2× (opencode server errors) → grok-4.3 delivered; Opus review fixed grip>1 amplification bug, added fog/light rain dimming, fixed per-frame-random state machine. User approved merge (classifier blocked self-merge).
 - 2026-07-11 — Board was empty → `on_empty: propose`: queued phase-5 batch ECON-001 (gun shop landmark, buy weapons/ammo), WEATHER-001 (rain cycles + wet handling + RAIN cheat), POLICE-001 (wanted escalation tiers 3/4/5★). Grounded in code: no weather/shop system exists; copWalkers fire block ~1692, cheats ~1384, LM array ~351.
 - 2026-07-01 — `.vibe/` scaffolded (autopilot, opencode+sonnet workers, headless gameplay gate). Awaiting first `/align`.
 - 2026-07-01 — Autonomous loop (on_empty=propose): LIFE-001 **done** (#11, explosions+enemy gunfire scatter crowd) + LIFE-002 **done** (#12, day/night crowd density). Both grok-4.3, single attempt, green CI. Pre-checked existing code (gunfire already scared peds via scarePeds) to avoid duplicate work.
