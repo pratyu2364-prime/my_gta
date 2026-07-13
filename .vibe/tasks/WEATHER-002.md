@@ -2,8 +2,8 @@ id: WEATHER-002
 title: Thunderstorm — lightning flashes + thunder during heavy rain
 phase: 7
 depends_on: none
-status: todo
-attempts: 0
+status: done
+attempts: 1
 acceptance:
  - While rainF > .8 (full rain), random lightning strikes every ~8-25s (timer sampled per strike, like rainDur).
  - A strike = 1-2 frame white-out flash of the sky/ambient (briefly lift scene.background toward white and boost hemi intensity, then revert — implement as a flash factor 0..1 that decays fast, multiplied into the existing per-frame sky block; must not fight tod or rainF, purely additive/multiplicative on top).
